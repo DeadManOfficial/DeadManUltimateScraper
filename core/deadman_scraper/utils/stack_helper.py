@@ -10,7 +10,9 @@ import logging
 import sys
 from pathlib import Path
 
-from .static_analysis import QualityChecker
+# NASA Standard: Robust import paths
+sys.path.append(str(Path(__file__).parent.parent.parent))
+from deadman_scraper.utils.static_analysis import QualityChecker
 
 logger = logging.getLogger("StackHelper")
 
@@ -42,7 +44,7 @@ class MissionStacker:
         # 3. Graphite Submission
         logger.info("Quality gate PASSED. Submitting stack to Command Center...")
         try:
-            subprocess.run(["gt", "submit", "--no-edit"], check=True)
+            subprocess.run(["gt", "submit", "--no-edit"], check=True, shell=sys.platform == "win32")
             logger.info("Stack successfully submitted.")
             return True
         except subprocess.CalledProcessError as e:
