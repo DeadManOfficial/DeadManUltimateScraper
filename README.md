@@ -1,45 +1,63 @@
 <div align="center">
 
-<img src="./scraper/HEADER.svg" width="800" alt="DeadMan Scraper Banner">
+<img src="./HEADER.svg" width="800" alt="DeadMan Scraper Banner">
 
-# DEADMAN ULTIMATE SCRAPER // PROJECT PORTAL
-### NASA-Standard Multi-Project Intelligence Infrastructure
+# DEADMAN ULTIMATE SCRAPER
+### NASA-Standard Autonomous Intelligence Engine // Codename: DEATH INCARNATE
 
-[![Repo](https://img.shields.io/badge/Project-Death_Incarnate-red?style=for-the-badge&logo=git&logoColor=white)](https://github.com/DeadManOfficial/DeadManUltimateScraper)
-[![Framework](https://img.shields.io/badge/Framework-CentralScraper-blue?style=for-the-badge&logo=python&logoColor=white)](https://github.com/DeadManOfficial/DeadManUltimateScraper/tree/main/scraper)
+[![Version](https://img.shields.io/badge/Version-2.0.0-red?style=for-the-badge&logo=probot&logoColor=white)](https://github.com/DeadManOfficial/DeadManUltimateScraper)
+[![Standards](https://img.shields.io/badge/Standards-NASA_NPR_7150.2-blue?style=for-the-badge&logo=nasa&logoColor=white)](https://github.com/DeadManOfficial/DeadManUltimateScraper)
+[![Security](https://img.shields.io/badge/Security-Bandit_Verified-success?style=for-the-badge&logo=shield&logoColor=white)](https://github.com/DeadManOfficial/DeadManUltimateScraper)
+
+---
+
+**"The best scraper since god made light."**
+
+A unified, high-fidelity intelligence gathering framework that merges logic from over 60 specialized scripts into a single, unstoppable engine. Designed for absolute freedom in discovery and exploitation across the Clearnet and Darknet.
 
 </div>
 
 ---
 
-## 📂 Project Architecture
+## 🛠️ Operational Capabilities
 
-This repository is organized into distinct functional domains to maintain NASA-standard modularity and reusability.
-
-### **1. [Core Scraper Framework (God Module)](./scraper/)**
-The high-fidelity engine that coordinates the entire intelligence gather stack.
-- **Location:** `./scraper/`
-- **Primary API:** `central_scraper.py`
-- **Features:** 5-Layer Fetching, JA4 Fingerprinting, Session Hijacking.
-
-### **2. Global Configuration & Shared Data**
-- **[./config/](./config/):** Centralized YAML manifests for cross-project parameters.
-- **[./data/](./data/):** Unified storage for intelligence databases and cached assets.
-- **[./tor/](./tor/):** Integrated portable TOR circuit infrastructure.
+- **🚀 Unstoppable Fetching:** 5-Layer Adaptive Stack (JA4 TLS -> Stealth Browser -> Selenium -> TOR -> CAPTCHA).
+- **📡 Total Traceability:** NASA-standard audit trail (`nasa_audit_trail.jsonl`) capturing every atomic event.
+- **🛡️ Extreme Stealth:** Real-time injection of Canvas, WebGL, and Audio noise to break fingerprinting.
+- **🔐 Session Hijacking:** Atomic cookie theft from local Chrome sessions to wake up inside authenticated walls.
+- **🔄 Stacked PRs:** NASA-standard incremental development via **Graphite CLI**.
 
 ---
 
-## ⚡ Quick Start
+## ⚡ Mission Execution
 
-```bash
-# 1. Initialize the Armory
-git clone https://github.com/DeadManOfficial/DeadManUltimateScraper.git
-cd DeadManUltimateScraper
+### **The God Module API**
+```python
+from central_scraper import CentralScraper, ScrapeRequest
 
-# 2. Access the God Module
-cd scraper
-pip install .
+async def launch_mission():
+    async with CentralScraper() as god:
+        # Initiate a high-fidelity mission
+        request = ScrapeRequest(
+            url="https://www.reddit.com/r/security/",
+            use_tor=True,
+            steal_session=True,  # Hijack local Chrome login
+            use_llm=True         # Activate AI intelligence analysis
+        )
+        
+        result = await god.scrape(request)
+        print(f"Intelligence Gathered: {result.extracted}")
 ```
+
+---
+
+## 📂 System Architecture
+
+- **`deadman_scraper/`**: The core engine library.
+- **`central_scraper.py`**: The high-level entry point (God Module).
+- **`armory.py`**: Mission readiness and deployment dashboard.
+- **`config/`**: Global shared configuration manifests.
+- **`data/`**: Intelligence vault and persistent state.
 
 ---
 
@@ -47,8 +65,8 @@ pip install .
 
 **Created by DEADMAN**
 
-*"The best scraper since god made light."*
+*"Structure enables excellence. Documentation enables continuity. Standards enable scale."*
 
-[![GitHub](https://img.shields.io/badge/DeadManOfficial-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/DeadManOfficial)
+[![Follow @DeadManOfficial](https://img.shields.io/badge/Follow_@DeadManOfficial-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/DeadManOfficial)
 
 </div>

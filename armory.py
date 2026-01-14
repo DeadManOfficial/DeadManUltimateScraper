@@ -10,8 +10,8 @@ import logging
 import sys
 from pathlib import Path
 
-# Add core to path
-sys.path.append(str(Path(__file__).parent / "core"))
+# Add root to path for central_scraper
+sys.path.append(str(Path(__file__).parent))
 
 from deadman_scraper.utils.health import HealthCheck
 from deadman_scraper.utils.cleanup import ProjectPurge
