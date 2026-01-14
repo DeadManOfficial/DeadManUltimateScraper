@@ -1,0 +1,12 @@
+venv/
+__pycache__/
+*.pyc
+data/
+logs/
+tmp/
+*.log
+dist/
+*.db
+nasa_audit_trail.jsonl
+.env
+.secrets/
