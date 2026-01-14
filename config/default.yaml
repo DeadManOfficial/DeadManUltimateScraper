@@ -1,0 +1,104 @@
+# DEADMAN ULTIMATE SCRAPER - Default Configuration
+# ================================================
+
+fetch:
+  layers:
+    - curl_cffi
+    - camoufox
+    - chromedriver
+    - tor
+  request_timeout: 30
+  page_load_timeout: 60
+  connect_timeout: 10
+  max_retries_per_layer: 2
+  max_concurrent: 10
+  max_concurrent_per_domain: 2
+  download_delay: 0.5
+  randomize_delay: true
+  delay_variance: 0.5
+
+browser_pool:
+  permanent_count: 2
+  hot_count: 3
+  cold_max: 10
+  headless: true
+  browser_type: chromium
+  pages_per_browser: 50
+
+tor:
+  enabled: true
+  method: docker
+  docker_image: dperson/torproxy
+  docker_container_name: deadman-tor
+  socks_host: "127.0.0.1"
+  socks_port: 9050
+  control_port: 9051
+  circuit_renew_interval: 300
+  renew_on_block: true
+  connect_timeout: 30
+
+proxy:
+  enabled: false
+  type: datacenter
+  rotate_on_block: true
+  rotate_interval: 0
+  max_uses_per_proxy: 100
+
+stealth:
+  inject_stealth: true
+  spoof_canvas: true
+  spoof_webgl: true
+  spoof_audio: true
+  impersonate_browser: chrome
+  impersonate_version: "120"
+  simulate_human: true
+  human_delay_min: 1.0
+  human_delay_max: 3.0
+  scroll_behavior: true
+  mouse_movement: true
+
+llm:
+  primary: mistral
+  fallback_chain:
+    - mistral
+    - groq
+    - cerebras
+    - ollama
+  mistral_model: mistral-small
+  groq_model: llama-3.3-70b-versatile
+  cerebras_model: llama-3.3-70b
+  ollama_model: llama3.2
+  quota_threshold: 0.9
+  heavy_tasks_provider: mistral
+  fast_tasks_provider: groq
+  offline_provider: ollama
+
+extraction:
+  default_strategy: auto
+  enable_pruning: true
+  enable_bm25: true
+  enable_chunking: true
+  chunk_size: 1000
+  chunk_overlap: 200
+  score_links: true
+  min_link_score: 0.3
+
+output:
+  default_format: json
+  output_dir: ./output
+  postgres_uri: postgresql://localhost/deadman_research
+  obsidian_vault: G:/DeadManAI_Vault
+  obsidian_folder: Scraped
+
+discovery:
+  clearnet_engines:
+    - duckduckgo
+    - brave
+    - bing
+    - github
+  darknet_engines:
+    - ahmia
+    - torch
+  max_results_per_engine: 50
+  deduplicate: true
+  search_delay: 2.0

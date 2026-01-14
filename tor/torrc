@@ -1,0 +1,7 @@
+# DEADMAN TOR Configuration
+SocksPort 9050
+ControlPort 9051
+DataDirectory G:/DeadManUltimateScraper/tor/data
+GeoIPFile G:/DeadManUltimateScraper/tor/data/geoip
+GeoIPv6File G:/DeadManUltimateScraper/tor/data/geoip6
+Log notice file G:/DeadManUltimateScraper/tor/tor.log

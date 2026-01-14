@@ -1,0 +1,493 @@
+#!/usr/bin/env python3
+"""
+DEADMAN ULTIMATE SCRAPER - CLI Interface
+=========================================
+No Limits. No Cost. Scrape Anything.
+
+Usage:
+    deadman scrape https://example.com
+    deadman search "AI research papers" --scrape-top 10
+    deadman batch urls.txt --output results.json
+"""
+
+import asyncio
+import json
+import os
+import sys
+from pathlib import Path
+from typing import Optional
+
+
+# Fix Windows console encoding for Unicode BEFORE importing Rich
+if sys.platform == "win32":
+    os.environ.setdefault("PYTHONIOENCODING", "utf-8")
+    try:
+        # Set console to UTF-8 mode
+        import ctypes
+        kernel32 = ctypes.windll.kernel32
+        kernel32.SetConsoleOutputCP(65001)  # UTF-8
+        kernel32.SetConsoleCP(65001)
+    except Exception:
+        pass
+
+import typer
+from rich import print as rprint
+from rich.console import Console
+from rich.panel import Panel
+from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn
+from rich.table import Table
+
+app = typer.Typer(
+    name="deadman",
+    help="DEADMAN ULTIMATE SCRAPER - No Limits. No Cost.",
+    add_completion=False,
+)
+console = Console(legacy_windows=(sys.platform == "win32"))
+
+
+def version_callback(value: bool):
+    if value:
+        from deadman_scraper import __version__
+        rprint(f"[bold cyan]DEADMAN ULTIMATE SCRAPER[/bold cyan] v{__version__}")
+        raise typer.Exit()
+
+
+@app.callback()
+def main(
+    version: bool = typer.Option(
+        None, "--version", "-v", callback=version_callback, help="Show version"
+    ),
+):
+    """DEADMAN ULTIMATE SCRAPER - No Limits. No Cost. Scrape Anything."""
+    pass
+
+
+# =============================================================================
+# SCRAPE COMMAND
+# =============================================================================
+
+
+@app.command()
+def scrape(
+    url: str = typer.Argument(..., help="URL to scrape"),
+    output: Optional[Path] = typer.Option(None, "-o", "--output", help="Output file"),
+    format: str = typer.Option("json", "-f", "--format", help="Output format (json/md/csv)"),
+    tor: bool = typer.Option(False, "--tor", help="Force TOR routing"),
+    extract: Optional[str] = typer.Option(None, "-e", "--extract", help="CSS selector to extract"),
+    llm: bool = typer.Option(False, "--llm", help="Use LLM for extraction"),
+    verbose: bool = typer.Option(False, "-V", "--verbose", help="Verbose output"),
+):
+    """
+    Scrape a single URL.
+
+    Examples:
+        deadman scrape https://example.com
+        deadman scrape https://example.com -o result.json
+        deadman scrape https://example.com --tor
+    """
+    async def _scrape():
+        from deadman_scraper import Engine, Config
+
+        config = Config.from_env()
+        config.load_api_keys()
+
+        # Use simple text progress for Windows compatibility
+        console.print(f"[cyan]Scraping {url}...[/cyan]")
+
+        async with Engine(config) as engine:
+            result = await engine.scrape(
+                url,
+                use_tor=tor,
+                extract_strategy=extract,
+                use_llm=llm,
+            )
+
+
+        if result.success:
+            console.print(f"\n[green]Success![/green] Layer {result.fetch_layer}")
+
+            if verbose:
+                console.print(f"Status: {result.status_code}")
+                console.print(f"Content-Type: {result.content_type}")
+                console.print(f"Timing: {result.timing.get('total', 0):.2f}s")
+
+            # Output - save FULL content to file
+            if output:
+                data = {
+                    "url": result.url,
+                    "status_code": result.status_code,
+                    "content_type": result.content_type,
+                    "fetch_layer": result.fetch_layer,
+                    "content": result.content,  # Full content - no truncation!
+                    "extracted": result.extracted,
+                }
+                with open(output, "w", encoding="utf-8") as f:
+                    if format == "json":
+                        json.dump(data, f, indent=2, ensure_ascii=False)
+                    elif format == "md":
+                        f.write(f"# {url}
+
+{result.content or ''}"); ###FIXED###
+                        f.write(f"# {url}
+
+{result.content or ''}"); ###FIXED###
+                        f.write(f"# {url}
+
+{result.content or ''}"); ###FIXED###
+                    else:
+                        f.write(result.content or "")
+                console.print(f"Saved to: {output}")
+                console.print(f"Content length: {len(result.content) if result.content else 0} chars")
+            else:
+                # Print preview
+                if result.content:
+                    console.print(Panel(
+                        result.content[:500] + "..." if len(result.content) > 500 else result.content,
+                        title="Content Preview",
+                    ))
+        else:
+            console.print(f"\n[red]Failed:[/red] {result.error}")
+            raise typer.Exit(1)
+
+    asyncio.run(_scrape())
+
+
+# =============================================================================
+# SEARCH COMMAND
+# =============================================================================
+
+
+@app.command()
+def search(
+    query: str = typer.Argument(..., help="Search query"),
+    engines: Optional[str] = typer.Option(None, "--engines", help="Engines (comma-separated)"),
+    max_results: int = typer.Option(20, "-n", "--max", help="Max results per engine"),
+    scrape_top: int = typer.Option(0, "--scrape-top", help="Scrape top N results"),
+    darkweb: bool = typer.Option(False, "--darkweb", help="Include dark web engines"),
+    filter_llm: bool = typer.Option(False, "--filter-llm", help="LLM relevance filtering"),
+    output: Optional[Path] = typer.Option(None, "-o", "--output", help="Output file"),
+):
+    """
+    Multi-engine search with optional scraping.
+
+    Examples:
+        deadman search "AI research papers"
+        deadman search "topic" --scrape-top 10
+        deadman search "topic" --darkweb --tor
+    """
+    async def _search():
+        from deadman_scraper import Engine, Config
+
+        config = Config.from_env()
+        config.load_api_keys()
+
+        engine_list = engines.split(",") if engines else None
+
+        console.print(f"\n[cyan]Searching:[/cyan] {query}")
+        if engine_list:
+            console.print(f"Engines: {engine_list}")
+
+        async with Engine(config) as engine:
+            if scrape_top > 0:
+                console.print(f"Scraping top {scrape_top} results...\n")
+
+                results = []
+                async for result in engine.search_and_scrape(
+                    query,
+                    engines=engine_list,
+                    max_results=max_results,
+                    scrape_top=scrape_top,
+                    darkweb=darkweb,
+                    filter_llm=filter_llm,
+                ):
+                    status = "[green]OK[/green]" if result.success else "[red]FAIL[/red]"
+                    console.print(f"  {status} {result.url}")
+                    results.append({
+                        "url": result.url,
+                        "success": result.success,
+                        "content_preview": result.content[:200] if result.content else None,
+                    })
+
+                if output:
+                    with open(output, "w", encoding="utf-8") as f:
+                        json.dump(results, f, indent=2, ensure_ascii=False)
+                    console.print(f"\nSaved to: {output}")
+            else:
+                # Just search, don't scrape
+                from deadman_scraper.discovery.aggregator import SearchAggregator
+
+                aggregator = SearchAggregator(config)
+                results = await aggregator.search(
+                    query,
+                    engines=engine_list,
+                    max_results=max_results,
+                    darkweb=darkweb,
+                )
+
+                console.print(f"\n[green]Found {len(results)} results[/green]\n")
+
+                table = Table(title="Search Results")
+                table.add_column("Title", style="cyan")
+                table.add_column("URL", style="blue")
+                table.add_column("Engine")
+
+                for r in results[:20]:
+                    table.add_row(
+                        r.get("title", "")[:50],
+                        r.get("url", "")[:60],
+                        r.get("engine", ""),
+                    )
+
+                console.print(table)
+
+                if output:
+                    with open(output, "w", encoding="utf-8") as f:
+                        json.dump(results, f, indent=2, ensure_ascii=False)
+                    console.print(f"\nSaved to: {output}")
+
+    asyncio.run(_search())
+
+
+# =============================================================================
+# BATCH COMMAND
+# =============================================================================
+
+
+@app.command()
+def batch(
+    urls_file: Path = typer.Argument(..., help="File with URLs (one per line)"),
+    output: Optional[Path] = typer.Option(None, "-o", "--output", help="Output file"),
+    format: str = typer.Option("json", "-f", "--format", help="Output format"),
+    concurrency: int = typer.Option(5, "-c", "--concurrency", help="Concurrent requests"),
+    tor: bool = typer.Option(False, "--tor", help="Force TOR routing"),
+):
+    """
+    Batch scrape URLs from file.
+
+    Examples:
+        deadman batch urls.txt -o results.json
+        deadman batch urls.txt --tor -c 3
+    """
+    if not urls_file.exists():
+        console.print(f"[red]Error:[/red] File not found: {urls_file}")
+        raise typer.Exit(1)
+
+    urls = [line.strip() for line in urls_file.read_text().splitlines() if line.strip()]
+    console.print(f"\n[cyan]Batch scraping {len(urls)} URLs[/cyan]\n")
+
+    async def _batch():
+        from deadman_scraper import Engine, Config
+
+        config = Config.from_env()
+        config.fetch.max_concurrent = concurrency
+
+        results = []
+        success = 0
+        failed = 0
+
+        async with Engine(config) as engine:
+            async for result in engine.scrape_many(urls, meta={"force_tor": tor}):
+                if result.success:
+                    success += 1
+                    status = "[green]OK[/green]"
+                else:
+                    failed += 1
+                    status = "[red]FAIL[/red]"
+
+                console.print(f"  {status} {result.url}")
+
+                results.append({
+                    "url": result.url,
+                    "success": result.success,
+                    "status_code": result.status_code,
+                    "error": result.error,
+                    "content_length": len(result.content) if result.content else 0,
+                })
+
+        console.print(f"\n[green]Success: {success}[/green] | [red]Failed: {failed}[/red]")
+
+        if output:
+            with open(output, "w", encoding="utf-8") as f:
+                json.dump(results, f, indent=2, ensure_ascii=False)
+            console.print(f"Saved to: {output}")
+
+    asyncio.run(_batch())
+
+
+# =============================================================================
+# TOR COMMAND
+# =============================================================================
+
+
+@app.command()
+def tor(
+    action: str = typer.Argument("status", help="Action: start/stop/restart/status"),
+):
+    """
+    Manage TOR proxy.
+
+    Examples:
+        deadman tor start
+        deadman tor status
+        deadman tor restart  # New exit IP
+    """
+    async def _tor():
+        from deadman_scraper.core.config import Config
+        from deadman_scraper.fetch.tor_manager import TORManager
+
+        config = Config.from_env()
+        manager = TORManager(config.tor)
+
+        if action == "start":
+            console.print("[cyan]Starting TOR...[/cyan]")
+            success = await manager.start()
+            if success:
+                ip = await manager.get_exit_ip()
+                console.print(f"[green]TOR running![/green]")
+                console.print(f"Proxy: {manager.proxy_url}")
+                if ip:
+                    console.print(f"Exit IP: {ip}")
+            else:
+                console.print("[red]Failed to start TOR[/red]")
+                raise typer.Exit(1)
+
+        elif action == "stop":
+            console.print("[cyan]Stopping TOR...[/cyan]")
+            await manager.stop()
+            console.print("[green]TOR stopped[/green]")
+
+        elif action == "restart":
+            console.print("[cyan]Renewing TOR circuit...[/cyan]")
+            success = await manager.renew_circuit()
+            if success:
+                ip = await manager.get_exit_ip()
+                console.print(f"[green]New circuit established![/green]")
+                if ip:
+                    console.print(f"Exit IP: {ip}")
+            else:
+                console.print("[red]Failed to renew circuit[/red]")
+
+        else:  # status
+            status = await manager.status()
+
+            table = Table(title="TOR Status")
+            table.add_column("Property", style="cyan")
+            table.add_column("Value")
+
+            table.add_row("Docker", "[green]Available[/green]" if status.docker_available else "[red]Not Found[/red]")
+            table.add_row("Running", "[green]Yes[/green]" if status.running else "[red]No[/red]")
+            if status.proxy_url:
+                table.add_row("Proxy", status.proxy_url)
+            if status.exit_ip:
+                table.add_row("Exit IP", status.exit_ip)
+
+            console.print(table)
+
+    asyncio.run(_tor())
+
+
+# =============================================================================
+# CONFIG COMMAND
+# =============================================================================
+
+
+@app.command()
+def config(
+    action: str = typer.Argument("show", help="Action: show/set/reset"),
+    key: Optional[str] = typer.Argument(None, help="Config key (e.g., fetch.max_concurrent)"),
+    value: Optional[str] = typer.Argument(None, help="Value to set"),
+):
+    """
+    Manage configuration.
+
+    Examples:
+        deadman config show
+        deadman config set fetch.max_concurrent 20
+        deadman config set llm.primary mistral
+    """
+    from deadman_scraper.core.config import Config
+    import yaml
+
+    config_file = Path("config/default.yaml")
+
+    if action == "show":
+        config = Config.from_env()
+        console.print(Panel(yaml.dump(config.model_dump(), default_flow_style=False), title="Configuration"))
+
+    elif action == "set":
+        if not key or not value:
+            console.print("[red]Usage:[/red] deadman config set <key> <value>")
+            raise typer.Exit(1)
+
+        console.print(f"Setting {key} = {value}")
+        # TODO: Implement config file writing
+
+    elif action == "reset":
+        console.print("[yellow]Resetting to defaults...[/yellow]")
+        config = Config()
+        config.to_yaml(config_file)
+        console.print(f"[green]Reset complete![/green] Saved to {config_file}")
+
+
+# =============================================================================
+# STATS COMMAND
+# =============================================================================
+
+
+@app.command()
+def stats():
+    """Show LLM quota usage and statistics."""
+    async def _stats():
+        from deadman_scraper.core.config import Config
+        from deadman_scraper.ai.llm_router import FreeLLMRouter
+
+        config = Config.from_env()
+        config.load_api_keys()
+
+        router = FreeLLMRouter(config.llm, config.api_keys)
+        status = router.get_quota_status()
+
+        table = Table(title="LLM Provider Quotas")
+        table.add_column("Provider", style="cyan")
+        table.add_column("Used", justify="right")
+        table.add_column("Remaining", justify="right")
+        table.add_column("Limit", justify="right")
+        table.add_column("Period")
+        table.add_column("Usage", justify="right")
+
+        for name, info in status.items():
+            usage_pct = info["percent_used"]
+            usage_str = f"{usage_pct:.1f}%"
+            if usage_pct > 90:
+                usage_str = f"[red]{usage_str}[/red]"
+            elif usage_pct > 70:
+                usage_str = f"[yellow]{usage_str}[/yellow]"
+            else:
+                usage_str = f"[green]{usage_str}[/green]"
+
+            table.add_row(
+                name.capitalize(),
+                str(info["used"]),
+                str(info["remaining"]),
+                str(info["limit"]),
+                info["period"],
+                usage_str,
+            )
+
+        console.print(table)
+
+    asyncio.run(_stats())
+
+
+# =============================================================================
+# MAIN ENTRY
+# =============================================================================
+
+
+def run():
+    """Entry point for the CLI."""
+    app()
+
+
+if __name__ == "__main__":
+    run()

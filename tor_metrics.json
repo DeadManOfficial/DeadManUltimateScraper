@@ -1,0 +1,8 @@
+{
+  "url": "https://metrics.torproject.org/",
+  "status_code": 200,
+  "content_type": "text/html;charset=utf-8",
+  "fetch_layer": 4,
+  "content": "\n\n\n\n<!DOCTYPE HTML>\n<html lang=\"en\" style=\"min-height:100%;\">\n<head>\n\n  <title>Welcome to Tor Metrics</title>\n\n  <meta charset=\"utf-8\">\n  <link href=\"/images/favicon.ico\" type=\"image/x-icon\" rel=\"shortcut icon\">\n\n  <!-- yes, we are handheld friendly :) -->\n  <meta name=\"HandheldFriendly\" content=\"True\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no\">\n  <meta name=\"apple-mobile-web-app-capable\" content=\"yes\">\n\n  <!-- icons for mobile devices -->\n  <link rel=\"apple-touch-icon\" href=\"/images/apple-touch-icon-152x152.png\">\n  <link rel=\"shortcut icon\" href=\"/images/android-icon.png\" sizes=\"196x196\">\n  <meta name=\"msapplication-square70x70logo\" content=\"/images/smalltile.png\">\n  <meta name=\"msapplication-square150x150logo\" content=\"/images/mediumtile.png\">\n  <meta name=\"msapplication-wide310x150logo\" content=\"/images/widetile.png\">\n  <meta name=\"msapplication-square310x310logo\" content=\"/images/largetile.png\">\n\n  <!-- jQuery -->\n ",
+  "extracted": {}
+}
