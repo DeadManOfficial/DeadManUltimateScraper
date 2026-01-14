@@ -161,13 +161,20 @@ class PersistentQueue:
 
     @contextmanager
     def _get_conn(self):
-        """Get database connection context manager."""
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        try:
-            yield conn
-        finally:
-            conn.close()
+        """
+        Get database connection with NASA-standard file locking.
+        Prevents corruption during high-concurrency missions.
+        """
+        import portalocker
+        lock_file = self.db_path.with_suffix(".lock")
+        
+        with portalocker.Lock(str(lock_file), timeout=10):
+            conn = sqlite3.connect(self.db_path)
+            conn.row_factory = sqlite3.Row
+            try:
+                yield conn
+            finally:
+                conn.close()
 
     def add_urls(
         self,

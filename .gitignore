@@ -10,3 +10,9 @@ dist/
 nasa_audit_trail.jsonl
 .env
 .secrets/
+.pytest_cache/
+.ruff_cache/
+tmpclaude-*
+test_*.py
+scraper_discovery_full.json
+scraper_files_list.txt
