@@ -32,6 +32,15 @@ The DeadMan Ultimate Scraper is a multi-layer, fault-tolerant intelligence gathe
 - **Typing:** Strict Python type-hinting throughout for static analysis.
 - **Traceability:** Requirement-to-code traceability via Signal enumeration.
 
-## 4. Maintenance and Scaling
+## 4. Development Workflow (NASA-Standard Stacking)
+To maintain zero-defect status, all complex features must be developed in "stacks" using Graphite. This ensures small, high-fidelity increments that pass 100% of unit tests before merging.
+
+### 4.1 Stacking Protocol
+1. **Initialize:** `gt create <branch_name>` for each atomic sub-feature.
+2. **Verify:** Ensure `ruff` and `pytest` pass for the specific stack.
+3. **Submit:** `gt submit` to create a chain of linked PRs on GitHub.
+4. **Prune:** Use `gt sync` to clean up local state after remote merges.
+
+## 5. Maintenance and Scaling
 - **Persistence:** SQLite-backed priority queue with ACID-compliant transactions.
 - **Intelligence Lifecycle:** Discovery -> Enqueue -> Scrape -> Analyze -> Store.

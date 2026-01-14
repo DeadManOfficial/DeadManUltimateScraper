@@ -29,6 +29,7 @@ A unified, high-fidelity intelligence gathering framework that merges logic from
 - **🛡️ Extreme Stealth:** Real-time injection of Canvas, WebGL, and Audio noise to break fingerprinting.
 - **🧠 AI Orchestration:** Integrated "Robin" search-to-intelligence patterns with autonomous synthesis agents.
 - **🔐 Session Hijacking:** Atomic cookie theft from local Chrome sessions to wake up inside authenticated walls.
+- **🔄 Stacked PRs:** NASA-standard incremental development via **Graphite CLI** for high-fidelity code review.
 - **💧 Media Laundering:** Forensic scrubbing of SynthID watermarks and signal signatures.
 
 ---

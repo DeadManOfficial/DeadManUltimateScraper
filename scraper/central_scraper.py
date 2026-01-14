@@ -92,11 +92,10 @@ class CentralScraper:
         if self.engine:
             await self.engine.stop()
 
-    async def scrape(self, request: ScrapeRequest) -> ScrapeResult:
+    async def scrape(self, request: ScrapeRequest, max_retries: int = 3) -> ScrapeResult:
         """
         Execute a single scrape operation with adaptive bypass and input sanitization.
-
-        NASA Standard: Comprehensive error isolation and input validation.
+        NASA Standard: Automatic state recovery and retry logic.
         """
         if not self.engine:
             raise RuntimeError("Engine not started. Use 'async with' context manager.")
@@ -114,32 +113,37 @@ class CentralScraper:
             from deadman_scraper.stealth.session import SessionStealer
             domain = urlparse(request.url).netloc
             cookies = SessionStealer().steal_cookies(domain)
-            # Add to headers (simplified)
             if cookies:
                 cookie_str = "; ".join([f"{k}={v}" for k, v in cookies.items()])
                 request.headers["Cookie"] = cookie_str
 
-        try:
-            logger.info(f"Initiating scrape for: {request.url}")
-            result = await self.engine.scrape(
-                url=request.url,
-                priority=request.priority,
-                headers=request.headers,
-                extract_strategy=request.extract_strategy,
-                use_tor=request.use_tor,
-                use_llm=request.use_llm
-            )
+        # 3. Execution with Recovery
+        for attempt in range(max_retries):
+            try:
+                logger.info(f"Scrape attempt {attempt + 1}/{max_retries} for: {request.url}")
+                result = await self.engine.scrape(
+                    url=request.url,
+                    priority=request.priority,
+                    headers=request.headers,
+                    extract_strategy=request.extract_strategy,
+                    use_tor=request.use_tor,
+                    use_llm=request.use_llm
+                )
 
-            if result.success:
-                logger.info(f"Successfully scraped {request.url} via layer {result.fetch_layer}")
-            else:
-                logger.error(f"Failed to scrape {request.url}: {result.error}")
+                if result.success:
+                    logger.info(f"Successfully scraped {request.url} via layer {result.fetch_layer}")
+                    return result
+                
+                logger.warning(f"Attempt {attempt + 1} failed: {result.error}")
+                await asyncio.sleep(2 ** attempt) # Exponential backoff
 
-            return result
+            except Exception as e:
+                logger.exception(f"Critical failure during scrape attempt {attempt + 1}")
+                if attempt == max_retries - 1:
+                    return ScrapeResult(url=request.url, success=False, error=str(e))
+                await asyncio.sleep(2 ** attempt)
 
-        except Exception as e:
-            logger.exception(f"Critical failure during scrape of {request.url}")
-            return ScrapeResult(url=request.url, success=False, error=str(e))
+        return ScrapeResult(url=request.url, success=False, error="Max retries exceeded")
 
     async def scrape_batch(self, requests: list[ScrapeRequest]) -> AsyncIterator[ScrapeResult]:
         """
