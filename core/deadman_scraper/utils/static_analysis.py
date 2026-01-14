@@ -5,8 +5,9 @@ NASA Standard: Automated verification of code quality and security.
 Wraps 'ruff' for linting and 'bandit' for security scanning.
 """
 
-import logging
 import subprocess
+import sys
+import logging
 from pathlib import Path
 
 logger = logging.getLogger("StaticAnalysis")
@@ -21,7 +22,7 @@ class QualityChecker:
         """Run ruff linter and formatter."""
         logger.info(f"Running ruff on {path}")
         try:
-            subprocess.run(["ruff", "check", str(path)], check=True)
+            subprocess.run(["ruff", "check", str(path)], check=True, shell=sys.platform == "win32")
             return True
         except subprocess.CalledProcessError:
             logger.error("Ruff linting failed.")
@@ -35,7 +36,7 @@ class QualityChecker:
         """Run bandit security scanner."""
         logger.info(f"Running bandit security scan on {path}")
         try:
-            subprocess.run(["bandit", "-r", str(path)], check=True)
+            subprocess.run(["bandit", "-r", str(path)], check=True, shell=sys.platform == "win32")
             return True
         except subprocess.CalledProcessError:
             logger.error("Bandit security scan found issues.")

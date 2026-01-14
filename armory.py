@@ -10,8 +10,8 @@ import logging
 import sys
 from pathlib import Path
 
-# Add scraper to path
-sys.path.append(str(Path(__file__).parent / "scraper"))
+# Add core to path
+sys.path.append(str(Path(__file__).parent / "core"))
 
 from deadman_scraper.utils.health import HealthCheck
 from deadman_scraper.utils.cleanup import ProjectPurge
