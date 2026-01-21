@@ -18,13 +18,23 @@ import sys
 from pathlib import Path
 from urllib.parse import urlparse
 
-# Add token-optimization to path
-sys.path.append(str(Path("G:/token-optimization")))
+# Add token-optimization to path (check multiple locations)
+import os
+_token_opt_paths = [
+    os.environ.get("TOKEN_OPTIMIZER_PATH", ""),
+    str(Path("G:/token-optimization/src")),
+    str(Path(__file__).parent / "token-optimization" / "src"),
+    str(Path.home() / "token-optimization" / "src"),
+]
+for _path in _token_opt_paths:
+    if _path and Path(_path).exists():
+        sys.path.insert(0, _path)
+        break
 
 from collections.abc import AsyncIterator
 
 from pydantic import BaseModel
-from token_optimizer.core import TokenOptimizer
+from token_optimizer import TokenOptimizer
 
 from deadman_scraper.ai.llm_router import FreeLLMRouter
 from deadman_scraper.core.config import Config
