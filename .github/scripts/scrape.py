@@ -283,6 +283,76 @@ async def try_playwright_stealth(url):
     return None
 
 
+# === OUTLAWPROMPTS DIRECT API ===
+async def try_outlawprompts_api():
+    """Try to hit OutlawPrompts API endpoints directly."""
+    logger.info('Trying OutlawPrompts direct API...')
+
+    import httpx
+
+    base_url = 'https://app.outlawprompts.com'
+    cookies = get_cookies_for_url(base_url)
+
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'application/json',
+        'Cookie': get_cookie_header(base_url),
+    }
+
+    # Common API patterns to try
+    api_endpoints = [
+        '/api/prompts',
+        '/api/personas',
+        '/api/snippets',
+        '/api/assets',
+        '/api/user/prompts',
+        '/api/user/personas',
+        '/api/user/assets',
+        '/api/export',
+        '/api/export/all',
+        '/trpc/prompt.getAll',
+        '/trpc/persona.getAll',
+        '/trpc/asset.getAll',
+    ]
+
+    all_data = []
+
+    async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
+        for endpoint in api_endpoints:
+            try:
+                url = f'{base_url}{endpoint}'
+                logger.info(f'  Trying: {url}')
+                resp = await client.get(url, headers=headers)
+                logger.info(f'    Status: {resp.status_code}')
+
+                if resp.status_code == 200:
+                    try:
+                        data = resp.json()
+                        if data:
+                            all_data.append({
+                                'endpoint': endpoint,
+                                'data': data
+                            })
+                            logger.info(f'    SUCCESS! Got data from {endpoint}')
+                    except:
+                        if len(resp.text) > 100:
+                            all_data.append({
+                                'endpoint': endpoint,
+                                'text': resp.text[:10000]
+                            })
+            except Exception as e:
+                logger.info(f'    Error: {e}')
+
+    if all_data:
+        # Save all API responses
+        with open('api_captures.json', 'w') as f:
+            json.dump(all_data, f, indent=2, default=str)
+        logger.info(f'Saved {len(all_data)} API responses')
+        return all_data
+
+    return None
+
+
 # === API SCRAPERS ===
 async def scrape_api(target, query, limit):
     try:
@@ -341,13 +411,20 @@ async def main():
         ]
 
         if RENDER:
-            # For outlawprompts, use playwright to intercept APIs
+            # For outlawprompts, try API endpoints directly first
             if 'outlawprompts' in TARGET:
-                methods = [('playwright_stealth', lambda: try_playwright_stealth(TARGET))]
-                logger.info('RENDER mode + OutlawPrompts: using playwright for API interception')
-            else:
-                methods = [(n, m) for n, m in methods if n in ('flaresolverr', 'undetected_chrome', 'playwright_stealth')]
-                logger.info('RENDER mode: browser methods only')
+                logger.info('OutlawPrompts detected: trying direct API access')
+                api_data = await try_outlawprompts_api()
+                if api_data:
+                    results['success'] = True
+                    results['method_used'] = 'direct_api'
+                    results['results'] = api_data
+                    results['count'] = len(api_data) if isinstance(api_data, list) else 1
+                    with open('scrape_results.json', 'w') as f:
+                        json.dump(results, f, indent=2, default=str)
+                    return
+            methods = [(n, m) for n, m in methods if n in ('flaresolverr', 'undetected_chrome', 'playwright_stealth')]
+            logger.info('RENDER mode: browser methods only')
 
         for name, method in methods:
             results['methods_tried'].append(name)
