@@ -15,6 +15,11 @@ if sys.platform == "win32":
         kernel32 = ctypes.windll.kernel32
         kernel32.SetConsoleOutputCP(65001)
         kernel32.SetConsoleCP(65001)
+        # Reconfigure stdout/stderr for UTF-8
+        if hasattr(sys.stdout, 'reconfigure'):
+            sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+        if hasattr(sys.stderr, 'reconfigure'):
+            sys.stderr.reconfigure(encoding='utf-8', errors='replace')
     except Exception:
         pass
 
@@ -92,6 +97,7 @@ def scrape(
                 console.print(f"Content-Type: {result.content_type}")
                 console.print(f"Timing: {result.timing.get('total', 0):.2f}s")
             if output:
+                output.parent.mkdir(parents=True, exist_ok=True)
                 data = {"url": result.url, "status_code": result.status_code, "content_type": result.content_type, "fetch_layer": result.fetch_layer, "content": result.content, "extracted": result.extracted}
                 with open(output, "w", encoding="utf-8") as f:
                     if format == "json":
@@ -136,6 +142,7 @@ def search(
                     console.print(f"  {status} {result.url}")
                     results.append({"url": result.url, "success": result.success, "content_preview": result.content[:200] if result.content else None})
                 if output:
+                    output.parent.mkdir(parents=True, exist_ok=True)
                     with open(output, "w", encoding="utf-8") as f:
                         json.dump(results, f, indent=2, ensure_ascii=False)
                     console.print(f"\n[{INFO_STYLE}]Data Persisted:[/] {output}")
@@ -152,6 +159,7 @@ def search(
                     table.add_row(r.get("title", "")[:50], r.get("url", "")[:60], r.get("engine", ""))
                 console.print(table)
                 if output:
+                    output.parent.mkdir(parents=True, exist_ok=True)
                     with open(output, "w", encoding="utf-8") as f:
                         json.dump(results, f, indent=2, ensure_ascii=False)
                     console.print(f"\n[{INFO_STYLE}]Inventory Persisted:[/] {output}")
@@ -188,6 +196,7 @@ def batch(
                 results.append({"url": result.url, "success": result.success, "status_code": result.status_code, "error": result.error, "content_length": len(result.content) if result.content else 0})
         console.print(f"\n[{SUCCESS_STYLE}]Success: {success}[/] | [{FAIL_STYLE}]Failed: {failed}[/]")
         if output:
+            output.parent.mkdir(parents=True, exist_ok=True)
             with open(output, "w", encoding="utf-8") as f:
                 json.dump(results, f, indent=2, ensure_ascii=False)
             console.print(f"[{INFO_STYLE}]Batch Data Persisted:[/] {output}")
