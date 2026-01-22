@@ -102,3 +102,72 @@ discovery:
   max_results_per_engine: 50
   deduplicate: true
   search_delay: 2.0
+
+# Dark Web Module Configuration (Darker + TorCrawl + Fresh Onions + SpiderFoot patterns)
+darkweb:
+  # Meta-search engines (14 available)
+  search_engines:
+    - ahmia
+    - torch
+    - haystack
+    - darksearch
+    - onionland
+    - phobos
+    - excavator
+    - deeplink
+    - tordex
+    - grams
+    - recon
+    - kilos
+    - submarine
+    - onionsearch
+  search_max_results: 50
+
+  # Crawl settings (TorCrawl patterns)
+  crawl_max_depth: 2
+  crawl_max_pages: 100
+  crawl_delay: 1.0
+  yara_rules_path: ./yara_rules
+
+  # Media extraction (DarkScrape patterns)
+  extract_media: true
+  download_media: false
+  media_path: ./darkweb_media
+  detect_faces: false
+  media_types:
+    - image/jpeg
+    - image/png
+    - image/gif
+    - image/webp
+    - video/mp4
+    - video/webm
+    - audio/mpeg
+
+  # OSINT collection (SpiderFoot patterns)
+  osint_types:
+    - email
+    - bitcoin
+    - ethereum
+    - monero
+    - onion_v3
+    - pgp_key_id
+    - pgp_fingerprint
+    - ip_address
+    - username
+    - password
+    - api_key
+    - jwt
+    - private_key
+
+  # Validation settings (Fresh Onions patterns)
+  validate_onions: true
+  detect_clones: true
+  clone_similarity_threshold: 0.85
+
+  # Output settings
+  output_format: json
+  output_path: ./darkweb_results
+
+  # Performance settings
+  max_concurrent: 5
+  timeout: 120

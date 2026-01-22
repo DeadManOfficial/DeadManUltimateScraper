@@ -30,6 +30,12 @@ try:
 except ImportError:
     HAS_DEEP = False
 
+try:
+    from .darkweb_commands import register_darkweb_commands
+    HAS_DARKWEB = True
+except ImportError:
+    HAS_DARKWEB = False
+
 app = typer.Typer(name="deadman", help="DEADMAN ULTIMATE SCRAPER // DEATH INCARNATE", add_completion=False)
 console = Console(legacy_windows=(sys.platform == "win32"), theme=None)
 
@@ -43,6 +49,10 @@ PANEL_STYLE = "green"
 # Register deep scraping commands
 if HAS_DEEP:
     register_deep_commands(app)
+
+# Register dark web commands
+if HAS_DARKWEB:
+    register_darkweb_commands(app)
 
 def version_callback(value: bool):
     if value:

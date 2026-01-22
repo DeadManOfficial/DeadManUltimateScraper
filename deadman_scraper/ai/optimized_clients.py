@@ -8,7 +8,7 @@ Ensures "Free Forever" compliance by minimizing payload size.
 import asyncio
 import logging
 
-from token_optimizer.core import TokenOptimizer
+from .token_optimizer import TokenOptimizer
 
 from .llm_router import LLMResponse
 
