@@ -82,35 +82,47 @@ jobs:
                   if target == 'reddit':
                       url = f'https://www.reddit.com/search.json?q={query}&limit={limit}'
                       resp = await session.get(url, timeout=30)
+                      print(f'Reddit response: {resp.status_code}')
                       if resp.status_code == 200:
                           data = resp.json()
                           results = [{'title': p['data']['title'], 'url': p['data']['url']} for p in data['data']['children']]
+                      else:
+                          print(f'Reddit blocked: {resp.text[:500]}')
 
                   elif target == 'hackernews':
-                      # Use Algolia HN API instead of Firebase
                       url = f'https://hn.algolia.com/api/v1/search?query={query}&hitsPerPage={limit}'
                       resp = await session.get(url, timeout=30)
+                      print(f'HackerNews response: {resp.status_code}')
                       if resp.status_code == 200:
                           data = resp.json()
                           results = [{'title': h['title'], 'url': h.get('url', f\"https://news.ycombinator.com/item?id={h['objectID']}\")} for h in data['hits']]
+                      else:
+                          print(f'HN error: {resp.text[:500]}')
 
                   elif target == 'stackoverflow':
                       url = f'https://api.stackexchange.com/2.3/search?order=desc&sort=relevance&intitle={query}&site=stackoverflow&pagesize={limit}'
                       resp = await session.get(url, timeout=30)
+                      print(f'StackOverflow response: {resp.status_code}')
                       if resp.status_code == 200:
                           data = resp.json()
                           results = [{'title': q['title'], 'url': q['link']} for q in data['items']]
+                      else:
+                          print(f'SO error: {resp.text[:500]}')
 
                   elif target == 'github':
                       url = f'https://api.github.com/search/repositories?q={query}&per_page={limit}'
                       resp = await session.get(url, timeout=30)
+                      print(f'GitHub response: {resp.status_code}')
                       if resp.status_code == 200:
                           data = resp.json()
                           results = [{'title': r['full_name'], 'url': r['html_url'], 'stars': r['stargazers_count']} for r in data['items']]
+                      else:
+                          print(f'GitHub error: {resp.text[:500]}')
 
                   else:
                       # Direct URL scrape
                       resp = await session.get(target, timeout=30)
+                      print(f'Direct scrape response: {resp.status_code}')
                       results = [{'url': target, 'status': resp.status_code, 'length': len(resp.text)}]
 
               print(f'\\nFound {len(results)} results:')
