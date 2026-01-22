@@ -197,49 +197,72 @@ async def try_playwright_stealth(url):
     logger.info('playwright-stealth...')
     try:
         from playwright.async_api import async_playwright
-        from playwright_stealth import stealth_async
+
+        # Try different stealth imports
+        stealth_func = None
+        try:
+            from playwright_stealth import stealth_async
+            stealth_func = stealth_async
+        except ImportError:
+            try:
+                from playwright_stealth import Stealth
+                stealth_func = lambda page: Stealth(page).apply()
+            except ImportError:
+                logger.info('  No stealth available, using plain playwright')
 
         api_responses = []
 
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True)
-            context = await browser.new_context(viewport={'width': 1920, 'height': 1080})
+            context = await browser.new_context(
+                viewport={'width': 1920, 'height': 1080},
+                user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            )
             if USE_COOKIES:
                 cookies = [{'name': k, 'value': v, 'domain': urlparse(url).netloc, 'path': '/'} for k, v in get_cookies_for_url(url).items()]
                 if cookies:
                     await context.add_cookies(cookies)
             page = await context.new_page()
 
-            # Intercept API responses
+            # Intercept ALL responses to find data endpoints
             async def handle_response(response):
-                if '/api/' in response.url or 'trpc' in response.url:
+                url_lower = response.url.lower()
+                # Capture anything that looks like data
+                if any(x in url_lower for x in ['/api/', 'trpc', 'graphql', '.json', 'prompts', 'personas', 'snippets', 'assets']):
                     try:
-                        body = await response.text()
-                        if len(body) > 100:
-                            api_responses.append({
-                                'url': response.url,
-                                'status': response.status,
-                                'body': body[:50000]  # Limit size
-                            })
-                            logger.info(f'  Captured API: {response.url} ({len(body)} bytes)')
+                        content_type = response.headers.get('content-type', '')
+                        if 'json' in content_type or 'text' in content_type:
+                            body = await response.text()
+                            if len(body) > 50:
+                                api_responses.append({
+                                    'url': response.url,
+                                    'status': response.status,
+                                    'content_type': content_type,
+                                    'body': body[:100000]
+                                })
+                                logger.info(f'  Captured: {response.url[:80]} ({len(body)} bytes)')
                     except:
                         pass
 
             page.on('response', handle_response)
-            await stealth_async(page)
-            await page.goto(url, wait_until='networkidle', timeout=60000)
-            await asyncio.sleep(5)
 
-            # Try clicking on sidebar items to trigger more API calls
-            try:
-                for selector in ['text=Standard Prompts', 'text=Personas', 'text=Snippets']:
-                    try:
-                        await page.click(selector, timeout=3000)
-                        await asyncio.sleep(2)
-                    except:
-                        pass
-            except:
-                pass
+            if stealth_func:
+                try:
+                    await stealth_func(page)
+                except:
+                    pass
+
+            await page.goto(url, wait_until='networkidle', timeout=60000)
+            await asyncio.sleep(3)
+
+            # Click sidebar items to load more data
+            for selector in ['text=Standard Prompts', 'text=Canvas Prompts', 'text=Personas', 'text=Snippets']:
+                try:
+                    await page.click(selector, timeout=5000)
+                    await asyncio.sleep(3)
+                    logger.info(f'  Clicked: {selector}')
+                except Exception as e:
+                    logger.info(f'  Could not click {selector}: {e}')
 
             html = await page.content()
             await browser.close()
@@ -248,13 +271,15 @@ async def try_playwright_stealth(url):
             if api_responses:
                 with open('api_captures.json', 'w') as f:
                     json.dump(api_responses, f, indent=2, default=str)
-                logger.info(f'  Saved {len(api_responses)} API captures')
+                logger.info(f'  Saved {len(api_responses)} API captures to api_captures.json')
 
             logger.info(f'  Got {len(html)} bytes')
             if len(html) > 1000:
                 return html
     except Exception as e:
         logger.warning(f'  Failed: {e}')
+        import traceback
+        traceback.print_exc()
     return None
 
 
