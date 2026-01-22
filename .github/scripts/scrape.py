@@ -316,8 +316,13 @@ async def main():
         ]
 
         if RENDER:
-            methods = [(n, m) for n, m in methods if n in ('flaresolverr', 'undetected_chrome', 'playwright_stealth')]
-            logger.info('RENDER mode: browser methods only')
+            # For outlawprompts, use playwright to intercept APIs
+            if 'outlawprompts' in TARGET:
+                methods = [('playwright_stealth', lambda: try_playwright_stealth(TARGET))]
+                logger.info('RENDER mode + OutlawPrompts: using playwright for API interception')
+            else:
+                methods = [(n, m) for n, m in methods if n in ('flaresolverr', 'undetected_chrome', 'playwright_stealth')]
+                logger.info('RENDER mode: browser methods only')
 
         for name, method in methods:
             results['methods_tried'].append(name)
