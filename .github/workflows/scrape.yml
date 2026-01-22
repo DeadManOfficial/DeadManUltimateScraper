@@ -27,6 +27,14 @@ on:
         options:
           - 'true'
           - 'false'
+      render:
+        description: 'Force browser rendering for JavaScript SPAs'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
 
 permissions:
   contents: write
@@ -152,6 +160,7 @@ jobs:
           LIMIT = int('${{ github.event.inputs.limit }}')
           EXTRACT = '${{ github.event.inputs.extract }}'
           BYPASS = '${{ github.event.inputs.bypass }}' == 'true'
+          RENDER = '${{ github.event.inputs.render }}' == 'true'
 
           results = {
               'target': TARGET,
@@ -159,6 +168,7 @@ jobs:
               'limit': LIMIT,
               'extract': EXTRACT,
               'bypass_enabled': BYPASS,
+              'render_enabled': RENDER,
               'methods_tried': [],
               'success': False,
               'method_used': None,
@@ -382,6 +392,7 @@ jobs:
               print(f'Target: {TARGET}')
               print(f'Query: {QUERY}')
               print(f'Bypass: {BYPASS}')
+              print(f'Render: {RENDER}')
               print('='*60)
 
               # Check if it's an API target or URL
@@ -413,7 +424,11 @@ jobs:
                       ('botasaurus', lambda: asyncio.get_event_loop().run_in_executor(None, try_botasaurus, TARGET)),
                   ]
 
-                  if not BYPASS:
+                  if RENDER:
+                      # Skip HTTP-only methods, use browser methods for JavaScript SPAs
+                      methods = [m for m in methods if m[0] in ('flaresolverr', 'undetected_chrome', 'nodriver', 'playwright_stealth', 'botasaurus')]
+                      print('RENDER mode: Using browser methods only for JavaScript execution')
+                  elif not BYPASS:
                       methods = methods[:2]  # Only curl_cffi methods
 
                   for name, method in methods:
