@@ -1,4 +1,5 @@
 name: DeadMan Scraper
+# Integrated 8-method bypass chain
 
 on:
   workflow_dispatch:
