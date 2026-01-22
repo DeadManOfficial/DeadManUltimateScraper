@@ -42,6 +42,24 @@ logger = logging.getLogger(__name__)
 
 
 # ============================================
+# Configuration Constants
+# ============================================
+DEFAULT_TIMEOUT = 60  # seconds
+SSL_TIMEOUT = 10  # seconds
+SUBDOMAIN_TIMEOUT = 30  # seconds
+DEFAULT_SSL_PORT = 443
+CONTEXT_WINDOW = 100  # characters around match
+MIN_CONFIDENCE = 0.3
+HIGH_CONFIDENCE_THRESHOLD = 0.8
+REDUCED_CONFIDENCE = 0.5
+LOW_CONFIDENCE = 0.3
+MAX_CONTEXT_LENGTH = 500
+MIN_WORDS_FOR_LANGUAGE = 10
+MAX_SEARCH_RESULTS = 20
+MONITOR_INTERVAL = 3600  # seconds
+
+
+# ============================================
 # Language Detection (lightweight)
 # ============================================
 LANGUAGE_INDICATORS = {
@@ -56,7 +74,7 @@ LANGUAGE_INDICATORS = {
 }
 
 
-def detect_language(text: str, min_confidence: float = 0.3) -> Tuple[str, float]:
+def detect_language(text: str, min_confidence: float = MIN_CONFIDENCE) -> Tuple[str, float]:
     """
     Detect language from text content.
 
@@ -69,7 +87,7 @@ def detect_language(text: str, min_confidence: float = 0.3) -> Tuple[str, float]
     text_lower = text.lower()
     words = re.findall(r'\b\w+\b', text_lower)
 
-    if len(words) < 10:
+    if len(words) < MIN_WORDS_FOR_LANGUAGE:
         return ("unknown", 0.0)
 
     scores = {}
@@ -109,7 +127,7 @@ class OSINTEntity:
             "entity_type": self.entity_type,
             "value": self.value,
             "source_url": self.source_url,
-            "context": self.context[:500] if self.context else "",
+            "context": self.context[:MAX_CONTEXT_LENGTH] if self.context else "",
             "confidence": self.confidence,
             "timestamp": self.timestamp,
             "metadata": self.metadata,
@@ -356,14 +374,22 @@ class OSINTCollector:
         "upload": ["upload", "file", "attach", "document"],
     }
 
-    # External OSINT services (clearnet)
-    OSINT_SERVICES = {
+    # External OSINT services (clearnet) - override via environment or config
+    # Set OSINT_SERVICE_<NAME>_URL environment variables to customize
+    DEFAULT_OSINT_SERVICES = {
         "haveibeenpwned": "https://haveibeenpwned.com/api/v3/breachedaccount/{email}",
         "hunter": "https://api.hunter.io/v2/email-verifier?email={email}",
         "dehashed": "https://api.dehashed.com/search?query={query}",
         "crt.sh": "https://crt.sh/?q={domain}&output=json",
         "securitytrails": "https://api.securitytrails.com/v1/domain/{domain}/subdomains",
     }
+
+    @classmethod
+    def get_osint_service_url(cls, service: str) -> str:
+        """Get OSINT service URL, checking environment override first."""
+        import os
+        env_key = f"OSINT_SERVICE_{service.upper().replace('.', '_')}_URL"
+        return os.environ.get(env_key, cls.DEFAULT_OSINT_SERVICES.get(service, ""))
 
     def __init__(
         self,
@@ -446,7 +472,7 @@ class OSINTCollector:
 
                 # Validate and add confidence
                 entity.confidence = self._validate_entity(entity)
-                if entity.confidence > 0.5:
+                if entity.confidence > REDUCED_CONFIDENCE:
                     entities.append(entity)
 
         logger.info(f"[OSINTCollector] Found {len(entities)} entities")
@@ -510,7 +536,7 @@ class OSINTCollector:
     async def collect_from_search(
         self,
         query: str,
-        max_results: int = 20,
+        max_results: int = MAX_SEARCH_RESULTS,
     ) -> List[OSINTEntity]:
         """
         Search dark web and collect OSINT from results.
@@ -741,10 +767,10 @@ class OSINTCollector:
             url = f"https://crt.sh/?q=%.{domain}&output=json"
 
             if self.fetch_func:
-                response = await self.fetch_func(url, timeout=30)
+                response = await self.fetch_func(url, timeout=SUBDOMAIN_TIMEOUT)
             else:
                 import httpx
-                async with httpx.AsyncClient(timeout=30) as client:
+                async with httpx.AsyncClient(timeout=SUBDOMAIN_TIMEOUT) as client:
                     resp = await client.get(url)
                     response = resp.text if resp.status_code == 200 else None
 
@@ -771,7 +797,7 @@ class OSINTCollector:
     # NEW: SSL Certificate Extraction (from FinalRecon)
     # ============================================
 
-    async def get_ssl_certificate(self, domain: str, port: int = 443) -> Optional[SSLCertInfo]:
+    async def get_ssl_certificate(self, domain: str, port: int = DEFAULT_SSL_PORT) -> Optional[SSLCertInfo]:
         """
         Extract SSL certificate information from domain.
         """
@@ -789,12 +815,12 @@ class OSINTCollector:
             logger.error(f"SSL cert extraction failed for {domain}: {e}")
             return None
 
-    def _get_ssl_cert_sync(self, domain: str, port: int = 443) -> Optional[SSLCertInfo]:
+    def _get_ssl_cert_sync(self, domain: str, port: int = DEFAULT_SSL_PORT) -> Optional[SSLCertInfo]:
         """Synchronous SSL certificate extraction."""
         try:
             context = ssl.create_default_context()
 
-            with socket.create_connection((domain, port), timeout=10) as sock:
+            with socket.create_connection((domain, port), timeout=SSL_TIMEOUT) as sock:
                 with context.wrap_socket(sock, server_hostname=domain) as ssock:
                     cert = ssock.getpeercert()
                     cert_bin = ssock.getpeercert(binary_form=True)
@@ -842,7 +868,7 @@ class OSINTCollector:
     async def monitor_keywords(
         self,
         keywords: List[str],
-        interval: int = 3600,
+        interval: int = MONITOR_INTERVAL,
         callback=None,
     ):
         """
@@ -890,7 +916,7 @@ class OSINTCollector:
             return "domain"
         return "keyword"
 
-    def _get_context(self, text: str, match: str, window: int = 100) -> str:
+    def _get_context(self, text: str, match: str, window: int = CONTEXT_WINDOW) -> str:
         """Get context around a match."""
         try:
             idx = text.lower().find(match.lower())
@@ -911,16 +937,16 @@ class OSINTCollector:
         # Email validation
         if entity.entity_type == "email":
             if not re.match(r'^[^@]+@[^@]+\.[^@]+$', entity.value):
-                confidence *= 0.3
+                confidence *= LOW_CONFIDENCE
             if any(x in entity.value.lower() for x in ["example", "test", "fake", "noreply"]):
-                confidence *= 0.5
+                confidence *= REDUCED_CONFIDENCE
 
         # Bitcoin validation (checksum)
         if entity.entity_type == "bitcoin":
             if not (entity.value.startswith("1") or
                     entity.value.startswith("3") or
                     entity.value.startswith("bc1")):
-                confidence *= 0.3
+                confidence *= LOW_CONFIDENCE
 
         # IP validation
         if entity.entity_type == "ip_address":
@@ -932,14 +958,14 @@ class OSINTCollector:
                 if octets[0] in ["10", "127", "0"] or \
                    (octets[0] == "192" and octets[1] == "168") or \
                    (octets[0] == "172" and 16 <= int(octets[1]) <= 31):
-                    confidence *= 0.3
+                    confidence *= LOW_CONFIDENCE
             except ValueError:
                 confidence = 0
 
         # Credit card Luhn check
         if entity.entity_type == "credit_card":
             if not self._luhn_check(entity.value.replace("-", "").replace(" ", "")):
-                confidence *= 0.3
+                confidence *= LOW_CONFIDENCE
 
         # Hash validation (check if it's likely a real hash vs random hex)
         if entity.entity_type in ["md5_hash", "sha1_hash", "sha256_hash"]:
@@ -979,7 +1005,7 @@ class OSINTCollector:
                 stats["by_type"][entity_type] = 0
             stats["by_type"][entity_type] += 1
 
-            if entity.confidence > 0.8:
+            if entity.confidence > HIGH_CONFIDENCE_THRESHOLD:
                 stats["high_confidence"] += 1
 
         return stats
@@ -990,10 +1016,10 @@ class OSINTCollector:
             if ".onion" in url and self.tor_manager:
                 return await self._fetch_via_tor(url)
             elif self.fetch_func:
-                return await self.fetch_func(url, timeout=60)
+                return await self.fetch_func(url, timeout=DEFAULT_TIMEOUT)
             else:
                 import httpx
-                async with httpx.AsyncClient(timeout=60) as client:
+                async with httpx.AsyncClient(timeout=DEFAULT_TIMEOUT) as client:
                     resp = await client.get(url)
                     return resp.text if resp.status_code == 200 else None
         except Exception as e:
@@ -1009,7 +1035,7 @@ class OSINTCollector:
             proxy_url = self.tor_manager.proxy_url
 
             async with httpx.AsyncClient(
-                timeout=httpx.Timeout(60),
+                timeout=httpx.Timeout(DEFAULT_TIMEOUT),
                 proxy=proxy_url,
             ) as client:
                 response = await client.get(url)
