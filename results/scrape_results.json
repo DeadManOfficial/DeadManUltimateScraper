@@ -1,0 +1,14 @@
+{
+  "target": "https://app.outlawprompts.com/library/prompts",
+  "query": "free api",
+  "extract": "prompts",
+  "render": true,
+  "use_cookies": true,
+  "methods_tried": [
+    "flaresolverr"
+  ],
+  "success": true,
+  "method_used": "flaresolverr",
+  "count": 0,
+  "results": []
+}

@@ -113,7 +113,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: scrape-results
-          path: scrape_results.json
+          path: |
+            scrape_results.json
+            raw_response.html
 
       - name: Summary
         run: |

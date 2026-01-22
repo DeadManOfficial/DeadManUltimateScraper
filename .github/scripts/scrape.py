@@ -70,6 +70,11 @@ def extract_content(html, mode):
     import re
     soup = BeautifulSoup(html, 'lxml')
 
+    # Save raw HTML for debugging
+    with open('raw_response.html', 'w', encoding='utf-8') as f:
+        f.write(html)
+    logger.info(f'Saved raw HTML ({len(html)} bytes) to raw_response.html')
+
     if mode == 'text':
         return soup.get_text(separator='\n', strip=True)
     elif mode == 'links':
