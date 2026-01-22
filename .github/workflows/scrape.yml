@@ -4,17 +4,29 @@ on:
   workflow_dispatch:
     inputs:
       target:
-        description: 'Target to scrape (reddit, hackernews, github, stackoverflow, or URL)'
+        description: 'Target (reddit, hackernews, github, stackoverflow, or any URL)'
         required: true
         default: 'reddit'
       query:
-        description: 'Search query'
-        required: true
+        description: 'Search query (for API targets)'
+        required: false
         default: 'free api'
       limit:
         description: 'Max results'
         required: false
         default: '25'
+      extract:
+        description: 'Extract mode for URLs (all, text, links, json, or CSS selector)'
+        required: false
+        default: 'all'
+      bypass:
+        description: 'Enable full bypass chain for protected sites'
+        required: false
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
 
 permissions:
   contents: write
@@ -22,6 +34,14 @@ permissions:
 jobs:
   scrape:
     runs-on: ubuntu-latest
+
+    services:
+      flaresolverr:
+        image: ghcr.io/flaresolverr/flaresolverr:latest
+        ports:
+          - 8191:8191
+        env:
+          LOG_LEVEL: info
 
     steps:
       - name: Checkout DeadManUltimateScraper
@@ -31,109 +51,409 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: DeadManOfficial/token-optimization
-          path: token-optimization
+          path: libs/token-optimization
+
+      - name: Checkout cloudscraper
+        uses: actions/checkout@v4
+        with:
+          repository: VeNoMouS/cloudscraper
+          path: libs/cloudscraper
+
+      - name: Checkout CloudflareBypassForScraping
+        uses: actions/checkout@v4
+        with:
+          repository: sarperavci/CloudflareBypassForScraping
+          path: libs/cf-bypass
+
+      - name: Checkout playwright-stealth
+        uses: actions/checkout@v4
+        with:
+          repository: AtuboDad/playwright_stealth
+          path: libs/playwright-stealth
+
+      - name: Checkout nodriver
+        uses: actions/checkout@v4
+        with:
+          repository: ultrafunkamsterdam/nodriver
+          path: libs/nodriver
+
+      - name: Checkout botasaurus
+        uses: actions/checkout@v4
+        with:
+          repository: omkarcloud/botasaurus
+          path: libs/botasaurus
 
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
+      - name: Install Chrome
+        run: |
+          wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+          echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
+          sudo apt-get update
+          sudo apt-get install -y google-chrome-stable xvfb
+
       - name: Install TOR
         run: |
-          sudo apt-get update
           sudo apt-get install -y tor
           sudo service tor start
-          sleep 10
+          sleep 5
           curl --socks5-hostname 127.0.0.1:9050 https://check.torproject.org/api/ip || echo "TOR check failed"
 
       - name: Install dependencies
         run: |
-          pip install -e ./token-optimization || true
-          pip install curl_cffi "httpx[socks]" beautifulsoup4 pydantic pyyaml stem tldextract fake-useragent requests aiohttp lxml PySocks
+          # Core dependencies
+          pip install -e ./libs/token-optimization || true
+          pip install -e ./libs/cloudscraper || pip install cloudscraper
+          pip install -e ./libs/playwright-stealth || pip install playwright-stealth
+          pip install -e ./libs/nodriver || pip install nodriver
+          pip install -e ./libs/botasaurus || pip install botasaurus
+
+          # Additional packages
+          pip install \
+            curl_cffi \
+            playwright \
+            undetected-chromedriver \
+            httpx[socks] \
+            beautifulsoup4 \
+            lxml \
+            pydantic \
+            pyyaml \
+            stem \
+            tldextract \
+            fake-useragent \
+            requests \
+            aiohttp \
+            PySocks
+
+          # Install browsers
+          playwright install chromium firefox
+          playwright install-deps
 
       - name: Run Scraper
         env:
-          PYTHONPATH: "${{ github.workspace }}/token-optimization/src:${{ github.workspace }}"
+          PYTHONPATH: "${{ github.workspace }}/libs/token-optimization/src:${{ github.workspace }}/libs/cloudscraper:${{ github.workspace }}/libs/cf-bypass:${{ github.workspace }}/libs/playwright-stealth:${{ github.workspace }}/libs/nodriver:${{ github.workspace }}/libs/botasaurus:${{ github.workspace }}"
+          DISPLAY: ":99"
         run: |
+          Xvfb :99 -screen 0 1920x1080x24 &
+          sleep 2
+
           python -c "
           import asyncio
           import json
-          from deadman_scraper.core.config import Config
-          from deadman_scraper.fetch.tor_manager import TORManager
+          import time
+          import sys
+          from urllib.parse import urlparse, quote
 
-          async def scrape():
-              config = Config.from_env()
-              tor = TORManager(config.tor)
+          TARGET = '${{ github.event.inputs.target }}'
+          QUERY = '${{ github.event.inputs.query }}'
+          LIMIT = int('${{ github.event.inputs.limit }}')
+          EXTRACT = '${{ github.event.inputs.extract }}'
+          BYPASS = '${{ github.event.inputs.bypass }}' == 'true'
 
-              if not await tor.start():
-                  print('TOR not available')
-                  return
+          results = {
+              'target': TARGET,
+              'query': QUERY,
+              'limit': LIMIT,
+              'extract': EXTRACT,
+              'bypass_enabled': BYPASS,
+              'methods_tried': [],
+              'success': False,
+              'method_used': None,
+              'count': 0,
+              'results': [],
+              'raw_html': None
+          }
 
-              print(f'TOR connected: {tor.proxy_url}')
+          # ===== EXTRACTION HELPERS =====
+          def extract_content(html, mode):
+              from bs4 import BeautifulSoup
+              soup = BeautifulSoup(html, 'lxml')
 
+              if mode == 'text':
+                  return soup.get_text(separator='\\n', strip=True)
+              elif mode == 'links':
+                  return [{'text': a.get_text(strip=True)[:100], 'href': a.get('href')} for a in soup.find_all('a', href=True)][:500]
+              elif mode == 'json':
+                  import re
+                  scripts = soup.find_all('script')
+                  json_data = []
+                  for s in scripts:
+                      if s.string:
+                          for pattern in [r'(?:window\\.__INITIAL_STATE__|window\\.__DATA__|__NEXT_DATA__)\\s*=\\s*({.*?});', r'<script[^>]*type=\"application/json\"[^>]*>([\\s\\S]*?)</script>']:
+                              matches = re.findall(pattern, str(s), re.DOTALL)
+                              for m in matches:
+                                  try:
+                                      json_data.append(json.loads(m))
+                                  except:
+                                      pass
+                  return json_data
+              elif mode.startswith('.') or mode.startswith('#') or mode.startswith('['):
+                  elements = soup.select(mode)
+                  return [{'html': str(e)[:500], 'text': e.get_text(strip=True)[:200]} for e in elements][:100]
+              else:  # all
+                  return {
+                      'title': soup.title.string if soup.title else None,
+                      'text': soup.get_text(separator='\\n', strip=True)[:10000],
+                      'links': [{'text': a.get_text(strip=True)[:50], 'href': a.get('href')} for a in soup.find_all('a', href=True)][:100],
+                      'images': [img.get('src') for img in soup.find_all('img', src=True)][:50],
+                      'meta': {meta.get('name', meta.get('property', 'unknown')): meta.get('content') for meta in soup.find_all('meta', content=True)}
+                  }
+
+          # ===== BYPASS METHODS =====
+
+          # Method 1: curl_cffi (fastest)
+          async def try_curl_cffi(url, use_tor=False):
+              print('\\n[1/7] curl_cffi + Chrome impersonation...')
+              try:
+                  from curl_cffi.requests import AsyncSession
+                  proxy = 'socks5h://127.0.0.1:9050' if use_tor else None
+                  async with AsyncSession(impersonate='chrome120', proxy=proxy) as s:
+                      resp = await s.get(url, timeout=30)
+                      print(f'  Status: {resp.status_code}')
+                      if resp.status_code == 200 and len(resp.text) > 1000:
+                          return resp.text
+              except Exception as e:
+                  print(f'  Failed: {e}')
+              return None
+
+          # Method 2: cloudscraper
+          def try_cloudscraper(url):
+              print('\\n[2/7] cloudscraper...')
+              try:
+                  import cloudscraper
+                  scraper = cloudscraper.create_scraper(browser={'browser': 'chrome', 'platform': 'linux'})
+                  resp = scraper.get(url, timeout=45)
+                  print(f'  Status: {resp.status_code}')
+                  if resp.status_code == 200 and len(resp.text) > 1000:
+                      return resp.text
+              except Exception as e:
+                  print(f'  Failed: {e}')
+              return None
+
+          # Method 3: FlareSolverr
+          def try_flaresolverr(url):
+              print('\\n[3/7] FlareSolverr...')
+              try:
+                  import requests
+                  resp = requests.post('http://localhost:8191/v1', json={
+                      'cmd': 'request.get',
+                      'url': url,
+                      'maxTimeout': 60000
+                  }, timeout=90)
+                  data = resp.json()
+                  print(f'  Status: {data.get(\"status\")}')
+                  if data.get('status') == 'ok':
+                      html = data['solution']['response']
+                      if len(html) > 1000:
+                          return html
+              except Exception as e:
+                  print(f'  Failed: {e}')
+              return None
+
+          # Method 4: undetected-chromedriver
+          def try_undetected_chrome(url):
+              print('\\n[4/7] undetected-chromedriver...')
+              try:
+                  import undetected_chromedriver as uc
+                  options = uc.ChromeOptions()
+                  options.add_argument('--headless=new')
+                  options.add_argument('--no-sandbox')
+                  options.add_argument('--disable-dev-shm-usage')
+                  options.add_argument('--disable-gpu')
+                  driver = uc.Chrome(options=options, version_main=120)
+                  driver.get(url)
+                  time.sleep(8)
+                  html = driver.page_source
+                  driver.quit()
+                  print(f'  Got {len(html)} bytes')
+                  if len(html) > 1000:
+                      return html
+              except Exception as e:
+                  print(f'  Failed: {e}')
+              return None
+
+          # Method 5: nodriver
+          async def try_nodriver(url):
+              print('\\n[5/7] nodriver...')
+              try:
+                  import nodriver as nd
+                  browser = await nd.start(headless=True)
+                  page = await browser.get(url)
+                  await asyncio.sleep(8)
+                  html = await page.get_content()
+                  await browser.stop()
+                  print(f'  Got {len(html)} bytes')
+                  if len(html) > 1000:
+                      return html
+              except Exception as e:
+                  print(f'  Failed: {e}')
+              return None
+
+          # Method 6: Playwright stealth
+          async def try_playwright_stealth(url):
+              print('\\n[6/7] Playwright + stealth...')
+              try:
+                  from playwright.async_api import async_playwright
+                  from playwright_stealth import stealth_async
+
+                  async with async_playwright() as p:
+                      browser = await p.chromium.launch(headless=True)
+                      context = await browser.new_context(
+                          viewport={'width': 1920, 'height': 1080},
+                          user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                      )
+                      page = await context.new_page()
+                      await stealth_async(page)
+                      await page.goto(url, wait_until='networkidle', timeout=60000)
+                      await asyncio.sleep(3)
+                      html = await page.content()
+                      await browser.close()
+                      print(f'  Got {len(html)} bytes')
+                      if len(html) > 1000:
+                          return html
+              except Exception as e:
+                  print(f'  Failed: {e}')
+              return None
+
+          # Method 7: Botasaurus
+          def try_botasaurus(url):
+              print('\\n[7/7] Botasaurus...')
+              try:
+                  from botasaurus import browser, AntiDetectDriver
+                  @browser(headless=True)
+                  def scrape(driver: AntiDetectDriver, data):
+                      driver.get(url)
+                      driver.sleep(5)
+                      return driver.page_source
+                  html = scrape()
+                  print(f'  Got {len(html)} bytes')
+                  if len(html) > 1000:
+                      return html
+              except Exception as e:
+                  print(f'  Failed: {e}')
+              return None
+
+          # ===== API SCRAPERS =====
+          async def scrape_api(target, query, limit):
               from curl_cffi.requests import AsyncSession
-              results = []
+              proxy = 'socks5h://127.0.0.1:9050'
 
-              target = '${{ github.event.inputs.target }}'
-              query = '${{ github.event.inputs.query }}'
-              limit = int('${{ github.event.inputs.limit }}')
-
-              async with AsyncSession(impersonate='chrome120', proxy=tor.proxy_url) as session:
+              async with AsyncSession(impersonate='chrome120', proxy=proxy) as session:
                   if target == 'reddit':
-                      url = f'https://www.reddit.com/search.json?q={query}&limit={limit}'
+                      url = f'https://www.reddit.com/search.json?q={quote(query)}&limit={limit}'
                       resp = await session.get(url, timeout=30)
-                      print(f'Reddit response: {resp.status_code}')
+                      print(f'Reddit: {resp.status_code}')
                       if resp.status_code == 200:
                           data = resp.json()
-                          results = [{'title': p['data']['title'], 'url': p['data']['url']} for p in data['data']['children']]
-                      else:
-                          print(f'Reddit blocked: {resp.text[:500]}')
+                          return [{'title': p['data']['title'], 'url': p['data']['url'], 'subreddit': p['data']['subreddit']} for p in data['data']['children']]
 
                   elif target == 'hackernews':
-                      url = f'https://hn.algolia.com/api/v1/search?query={query}&hitsPerPage={limit}'
+                      url = f'https://hn.algolia.com/api/v1/search?query={quote(query)}&hitsPerPage={limit}'
                       resp = await session.get(url, timeout=30)
-                      print(f'HackerNews response: {resp.status_code}')
+                      print(f'HackerNews: {resp.status_code}')
                       if resp.status_code == 200:
                           data = resp.json()
-                          results = [{'title': h['title'], 'url': h.get('url', f\"https://news.ycombinator.com/item?id={h['objectID']}\")} for h in data['hits']]
-                      else:
-                          print(f'HN error: {resp.text[:500]}')
+                          return [{'title': h['title'], 'url': h.get('url', f\"https://news.ycombinator.com/item?id={h['objectID']}\"), 'points': h.get('points')} for h in data['hits']]
 
                   elif target == 'stackoverflow':
-                      url = f'https://api.stackexchange.com/2.3/search?order=desc&sort=relevance&intitle={query}&site=stackoverflow&pagesize={limit}'
+                      url = f'https://api.stackexchange.com/2.3/search?order=desc&sort=relevance&intitle={quote(query)}&site=stackoverflow&pagesize={limit}'
                       resp = await session.get(url, timeout=30)
-                      print(f'StackOverflow response: {resp.status_code}')
+                      print(f'StackOverflow: {resp.status_code}')
                       if resp.status_code == 200:
                           data = resp.json()
-                          results = [{'title': q['title'], 'url': q['link']} for q in data['items']]
-                      else:
-                          print(f'SO error: {resp.text[:500]}')
+                          return [{'title': q['title'], 'url': q['link'], 'score': q.get('score')} for q in data['items']]
 
                   elif target == 'github':
-                      url = f'https://api.github.com/search/repositories?q={query}&per_page={limit}'
+                      url = f'https://api.github.com/search/repositories?q={quote(query)}&per_page={limit}'
                       resp = await session.get(url, timeout=30)
-                      print(f'GitHub response: {resp.status_code}')
+                      print(f'GitHub: {resp.status_code}')
                       if resp.status_code == 200:
                           data = resp.json()
-                          results = [{'title': r['full_name'], 'url': r['html_url'], 'stars': r['stargazers_count']} for r in data['items']]
-                      else:
-                          print(f'GitHub error: {resp.text[:500]}')
+                          return [{'title': r['full_name'], 'url': r['html_url'], 'stars': r['stargazers_count'], 'description': r.get('description', '')[:100]} for r in data['items']]
 
+              return None
+
+          # ===== MAIN =====
+          async def main():
+              print('='*60)
+              print(f'Target: {TARGET}')
+              print(f'Query: {QUERY}')
+              print(f'Bypass: {BYPASS}')
+              print('='*60)
+
+              # Check if it's an API target or URL
+              is_url = TARGET.startswith('http://') or TARGET.startswith('https://')
+
+              if not is_url:
+                  # API scraping
+                  print(f'\\nScraping {TARGET} API...')
+                  api_results = await scrape_api(TARGET, QUERY, LIMIT)
+                  if api_results:
+                      results['success'] = True
+                      results['method_used'] = f'{TARGET}_api'
+                      results['results'] = api_results
+                      results['count'] = len(api_results)
                   else:
-                      # Direct URL scrape
-                      resp = await session.get(target, timeout=30)
-                      print(f'Direct scrape response: {resp.status_code}')
-                      results = [{'url': target, 'status': resp.status_code, 'length': len(resp.text)}]
+                      print('API scrape failed or returned 0 results')
+              else:
+                  # URL scraping with bypass chain
+                  print(f'\\nScraping URL with bypass chain...')
 
-              print(f'\\nFound {len(results)} results:')
-              for r in results[:10]:
-                  print(f\"  - {r.get('title', r.get('url', 'N/A'))[:60]}\")
+                  methods = [
+                      ('curl_cffi', lambda: try_curl_cffi(TARGET, use_tor=False)),
+                      ('curl_cffi_tor', lambda: try_curl_cffi(TARGET, use_tor=True)),
+                      ('cloudscraper', lambda: asyncio.get_event_loop().run_in_executor(None, try_cloudscraper, TARGET)),
+                      ('flaresolverr', lambda: asyncio.get_event_loop().run_in_executor(None, try_flaresolverr, TARGET)),
+                      ('undetected_chrome', lambda: asyncio.get_event_loop().run_in_executor(None, try_undetected_chrome, TARGET)),
+                      ('nodriver', lambda: try_nodriver(TARGET)),
+                      ('playwright_stealth', lambda: try_playwright_stealth(TARGET)),
+                      ('botasaurus', lambda: asyncio.get_event_loop().run_in_executor(None, try_botasaurus, TARGET)),
+                  ]
 
-              # Save results
+                  if not BYPASS:
+                      methods = methods[:2]  # Only curl_cffi methods
+
+                  for name, method in methods:
+                      results['methods_tried'].append(name)
+                      try:
+                          if asyncio.iscoroutinefunction(method):
+                              html = await method()
+                          else:
+                              html = await method()
+
+                          if html and len(html) > 1000:
+                              results['success'] = True
+                              results['method_used'] = name
+                              results['raw_html'] = html[:100000]
+                              extracted = extract_content(html, EXTRACT)
+                              results['results'] = extracted if isinstance(extracted, list) else [extracted]
+                              results['count'] = len(results['results']) if isinstance(results['results'], list) else 1
+                              print(f'\\n*** SUCCESS with {name}! ***')
+                              break
+                      except Exception as e:
+                          print(f'  Error in {name}: {e}')
+
+              # Summary
+              print('\\n' + '='*60)
+              print(f'Success: {results[\"success\"]}')
+              print(f'Method: {results[\"method_used\"]}')
+              print(f'Results: {results[\"count\"]}')
+
+              if results['results']:
+                  print('\\nPreview:')
+                  preview = results['results'][:5] if isinstance(results['results'], list) else results['results']
+                  print(json.dumps(preview, indent=2, default=str)[:2000])
+
+              # Save
               with open('scrape_results.json', 'w') as f:
-                  json.dump({'target': target, 'query': query, 'count': len(results), 'results': results}, f, indent=2)
+                  # Don't save raw HTML to keep file small
+                  save_results = {k: v for k, v in results.items() if k != 'raw_html'}
+                  json.dump(save_results, f, indent=2, default=str)
 
-          asyncio.run(scrape())
+          asyncio.run(main())
           "
 
       - name: Upload Results
@@ -146,8 +466,13 @@ jobs:
         run: |
           echo "### DeadMan Scraper Results" >> "$GITHUB_STEP_SUMMARY"
           echo "Target: ${{ github.event.inputs.target }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "Query: ${{ github.event.inputs.query }}" >> "$GITHUB_STEP_SUMMARY"
           if [ -f scrape_results.json ]; then
+            success=$(jq '.success' scrape_results.json)
+            method=$(jq -r '.method_used' scrape_results.json)
             count=$(jq '.count' scrape_results.json)
+            echo "Success: $success" >> "$GITHUB_STEP_SUMMARY"
+            echo "Method: $method" >> "$GITHUB_STEP_SUMMARY"
             echo "Results: $count" >> "$GITHUB_STEP_SUMMARY"
+            echo "### Methods Tried" >> "$GITHUB_STEP_SUMMARY"
+            jq -r '.methods_tried[]' scrape_results.json >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
           fi
