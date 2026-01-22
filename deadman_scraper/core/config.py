@@ -69,7 +69,7 @@ class TORConfig(BaseModel):
     """TOR configuration."""
 
     enabled: bool = True
-    method: Literal["docker", "portable", "system", "cloud"] = "portable"
+    method: Literal["docker", "portable", "system", "cloud"] = "system"
 
     # Docker settings
     docker_image: str = "dperson/torproxy"

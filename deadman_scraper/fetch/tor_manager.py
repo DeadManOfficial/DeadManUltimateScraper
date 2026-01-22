@@ -77,31 +77,20 @@ class TORManager:
         Start TOR proxy.
 
         Returns True if TOR is running (started or already running).
-        Automatically falls back through methods: portable -> system -> docker.
         """
         method = self.config.method
 
-        # Try specified method first
         if method == "docker":
-            if await self._start_docker():
-                return True
-        elif method == "portable":
-            if await self._start_portable():
-                return True
-            # Fallback: check if system TOR is already running
-            logger.info("[TOR] Portable failed, trying system TOR...")
-            if await self._check_system_tor():
-                self._running = True
-                logger.info(f"[TOR] System TOR available at {self.proxy_url}")
-                return True
+            return await self._start_docker()
         elif method == "system":
             if await self._check_system_tor():
                 self._running = True
+                logger.info(f"[TOR] Connected via system TOR at {self.proxy_url}")
                 return True
+            return False
         else:
-            logger.error(f"Unknown TOR method: {method}")
-
-        return False
+            logger.error(f"Unsupported TOR method: {method}")
+            return False
 
     async def stop(self) -> bool:
         """Stop TOR proxy."""
