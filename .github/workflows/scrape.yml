@@ -116,6 +116,7 @@ jobs:
           path: |
             scrape_results.json
             raw_response.html
+            api_captures.json
 
       - name: Summary
         run: |

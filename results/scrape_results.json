@@ -1,7 +1,7 @@
 {
-  "target": "https://app.outlawprompts.com/library/prompts",
+  "target": "https://app.outlawprompts.com/",
   "query": "free api",
-  "extract": "prompts",
+  "extract": "all",
   "render": true,
   "use_cookies": true,
   "methods_tried": [
@@ -9,6 +9,58 @@
   ],
   "success": true,
   "method_used": "flaresolverr",
-  "count": 0,
-  "results": []
+  "count": 1,
+  "results": [
+    {
+      "title": "OutlawPrompt",
+      "text": "OutlawPrompt\nRecently Edited\nStandard Prompts\nCanvas Prompts\nPersonas\nSnippets\nProjects\nTesting Sandbox\nFREE\nImage Sandbox\nTag Manager\nAPI Keys\nSettings\n42\n192\n20\n2\n1\n0\nFREE Tokens Available!\n510K\nTry the Testing Sandbox now \u2192\nDeadMan\nTesting Sandbox\nComparative Test Runner\nConfigure and run multiple models side-by-side to compare outputs in real-time.\nStats\nLeaderboard\nHistory\n1\nDemo Tokens: 510K remaining\n(2K / 512K used)\nConfiguration\nTest Mode\n\u2696\ufe0f Comparison\n\ud83d\udcac Conversation\n\ud83d\udd25 Batch\nSingle-round mode: Fresh test each time. Best for comparing model responses to the same input.\nOutput Display\nStream\nComplete\nShow tokens as they arrive. See output in real-time.\nReasoning Output\nShow\nHide\nShow reasoning/thinking output for models like o3, o4, gpt-5 (collapsible).\nBlind Testing Mode\nBlind\nNormal\nProvider names visible in output. Standard testing mode.\nSystem Prompt\n\ud83c\udf10 Global\n\ud83c\udfaf Per-Lane\n-- Select a Persona (optional) --\n\"Vector Glyphman\"\n\"Tag Generator - Sammy Sortah\"\n\"Second Chance Mentor: Walker Riser\"\n\"Prompt Magnus: Sorel Scriptalyn\"\n\"Prompt Ideation Muse - Prompt Tart\"\n\"Pathless Polymath \u2013 Miyamoto Musashi\"\n\"Parental Advisor - Is this ok for kids?:  Robin Kinley\"\n\"Mindfulness Sage \u2013 Manny McYoda\"\n\"Market Factor Analyst: Jules Keystone\"\n\"Iron-Fisted Leader -  Niccol\u00f2 Machiavelli\"\n\"Home Finance Helper: Margo Saverly\"\n\"Ghost CMS Virtuoso \u2013 Cass Nix\"\n\"Emotional Navigator - Watts Bugginia\"\n\"Deadwood Wordsmith: Ward Bardwright\"\n\"Creative Web Alchemist: Arlo Kaleidos\"\n\"Cataclysmic Museform: Arielle Mythara\"\n\"Canine Veterinarian: Doggie Doctor\"\n\"Anger Management Coach: Rick R. Ageaholic\"\n\"Android Coder & DJ: Kimmy Dataplex\"\n\"2000s Meme Maestro: All The Things!\"\nAdd Comparison\nPrompt\nRun All Tests\nSave Configuration\nLoading available models...",
+      "links": [
+        {
+          "text": "",
+          "href": "/"
+        },
+        {
+          "text": "Standard Prompts",
+          "href": "#"
+        },
+        {
+          "text": "Canvas Prompts",
+          "href": "#"
+        },
+        {
+          "text": "Personas",
+          "href": "#"
+        },
+        {
+          "text": "Snippets",
+          "href": "#"
+        },
+        {
+          "text": "Projects",
+          "href": "#"
+        },
+        {
+          "text": "Testing SandboxFREE",
+          "href": "#"
+        },
+        {
+          "text": "Image Sandbox",
+          "href": "#"
+        },
+        {
+          "text": "Tag Manager",
+          "href": "#"
+        },
+        {
+          "text": "API Keys",
+          "href": "#"
+        },
+        {
+          "text": "Settings",
+          "href": "#"
+        }
+      ],
+      "html_length": 87375
+    }
+  ]
 }

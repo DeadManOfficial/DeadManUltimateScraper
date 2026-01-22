@@ -198,6 +198,9 @@ async def try_playwright_stealth(url):
     try:
         from playwright.async_api import async_playwright
         from playwright_stealth import stealth_async
+
+        api_responses = []
+
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True)
             context = await browser.new_context(viewport={'width': 1920, 'height': 1080})
@@ -206,11 +209,47 @@ async def try_playwright_stealth(url):
                 if cookies:
                     await context.add_cookies(cookies)
             page = await context.new_page()
+
+            # Intercept API responses
+            async def handle_response(response):
+                if '/api/' in response.url or 'trpc' in response.url:
+                    try:
+                        body = await response.text()
+                        if len(body) > 100:
+                            api_responses.append({
+                                'url': response.url,
+                                'status': response.status,
+                                'body': body[:50000]  # Limit size
+                            })
+                            logger.info(f'  Captured API: {response.url} ({len(body)} bytes)')
+                    except:
+                        pass
+
+            page.on('response', handle_response)
             await stealth_async(page)
             await page.goto(url, wait_until='networkidle', timeout=60000)
             await asyncio.sleep(5)
+
+            # Try clicking on sidebar items to trigger more API calls
+            try:
+                for selector in ['text=Standard Prompts', 'text=Personas', 'text=Snippets']:
+                    try:
+                        await page.click(selector, timeout=3000)
+                        await asyncio.sleep(2)
+                    except:
+                        pass
+            except:
+                pass
+
             html = await page.content()
             await browser.close()
+
+            # Save captured API responses
+            if api_responses:
+                with open('api_captures.json', 'w') as f:
+                    json.dump(api_responses, f, indent=2, default=str)
+                logger.info(f'  Saved {len(api_responses)} API captures')
+
             logger.info(f'  Got {len(html)} bytes')
             if len(html) > 1000:
                 return html
