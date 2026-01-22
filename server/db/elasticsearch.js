@@ -1,10 +1,12 @@
 /**
  * Elasticsearch connection and utilities
+ *
+ * Security: Supports X-Pack authentication via environment variables.
  */
 
 const { Client } = require('@elastic/elasticsearch');
 
-const INDEX_NAME = 'deadman_scrapes';
+const INDEX_NAME = process.env.ELASTICSEARCH_INDEX || 'deadman_scrapes';
 
 // Index mappings
 const DATA_MAPPINGS = {
@@ -38,12 +40,28 @@ let client = null;
 
 async function connectElasticsearch() {
   const host = process.env.ELASTICSEARCH_HOST || 'http://localhost:9200';
+  const username = process.env.ELASTIC_USERNAME;
+  const password = process.env.ELASTIC_PASSWORD;
 
-  client = new Client({
+  // Build client config
+  const clientConfig = {
     node: host,
     maxRetries: 5,
     requestTimeout: 60000
-  });
+  };
+
+  // Add authentication if credentials provided
+  if (username && password) {
+    clientConfig.auth = {
+      username,
+      password
+    };
+    console.log('Elasticsearch: Using authenticated connection');
+  } else {
+    console.log('Elasticsearch: Using unauthenticated connection (not recommended for production)');
+  }
+
+  client = new Client(clientConfig);
 
   // Test connection
   await client.ping();

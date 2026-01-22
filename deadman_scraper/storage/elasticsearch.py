@@ -15,6 +15,7 @@ Based on zilbers/dark-web-scraper patterns, enhanced for DeadMan.
 
 import hashlib
 import logging
+import os
 from datetime import datetime
 from typing import Any
 
@@ -105,38 +106,63 @@ class ElasticsearchStore:
 
     def __init__(
         self,
-        hosts: list[str] | str = "http://localhost:9200",
-        index_name: str = "deadman_scrapes",
+        hosts: list[str] | str = None,
+        index_name: str = None,
         max_retries: int = 5,
         request_timeout: int = 60,
-        sniff_on_start: bool = True
+        sniff_on_start: bool = False,
+        username: str = None,
+        password: str = None
     ):
         """
         Initialize Elasticsearch connection.
 
         Args:
-            hosts: Elasticsearch host(s)
+            hosts: Elasticsearch host(s) (defaults to ELASTICSEARCH_HOST env var)
             index_name: Default index for scraped data
             max_retries: Max connection retries
             request_timeout: Request timeout in seconds
             sniff_on_start: Sniff cluster nodes on startup
+            username: Elasticsearch username (defaults to ELASTIC_USERNAME env var)
+            password: Elasticsearch password (defaults to ELASTIC_PASSWORD env var)
         """
         if not HAS_ELASTICSEARCH:
             raise ImportError(
                 "elasticsearch package required. Install with: pip install elasticsearch>=8.0.0"
             )
 
+        # Get config from environment if not provided
+        if hosts is None:
+            hosts = os.environ.get("ELASTICSEARCH_HOST", "http://localhost:9200")
+        if index_name is None:
+            index_name = os.environ.get("ELASTICSEARCH_INDEX", "deadman_scrapes")
+        if username is None:
+            username = os.environ.get("ELASTIC_USERNAME")
+        if password is None:
+            password = os.environ.get("ELASTIC_PASSWORD")
+
         if isinstance(hosts, str):
             hosts = [hosts]
 
         self.index_name = index_name
-        self.client = Elasticsearch(
-            hosts=hosts,
-            max_retries=max_retries,
-            request_timeout=request_timeout,
-            sniff_on_start=sniff_on_start,
-            retry_on_timeout=True
-        )
+
+        # Build client config
+        client_config = {
+            "hosts": hosts,
+            "max_retries": max_retries,
+            "request_timeout": request_timeout,
+            "sniff_on_start": sniff_on_start,
+            "retry_on_timeout": True
+        }
+
+        # Add authentication if credentials provided
+        if username and password:
+            client_config["basic_auth"] = (username, password)
+            logger.info("Elasticsearch: Using authenticated connection")
+        else:
+            logger.warning("Elasticsearch: Using unauthenticated connection (not recommended for production)")
+
+        self.client = Elasticsearch(**client_config)
 
         self._ensure_index()
         logger.info(f"Elasticsearch connected: {hosts}, index: {index_name}")
@@ -165,9 +191,9 @@ class ElasticsearchStore:
 
     @staticmethod
     def _generate_doc_id(doc: dict) -> str:
-        """Generate MD5 hash for document deduplication."""
+        """Generate SHA-256 hash for document deduplication."""
         key = f"{doc.get('url', '')}{doc.get('scraped_at', '')}{doc.get('title', '')}"
-        return hashlib.md5(key.encode()).hexdigest()
+        return hashlib.sha256(key.encode()).hexdigest()[:32]
 
     def index_document(self, doc: dict) -> dict:
         """
