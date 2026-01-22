@@ -58,5 +58,5 @@ class ProjectPurge:
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    purge = ProjectPurge(Path("G:/DeadManUltimateScraper"))
+    purge = ProjectPurge(Path(__file__).parent.parent.parent)
     purge.execute()

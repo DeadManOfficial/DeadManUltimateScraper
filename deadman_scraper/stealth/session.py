@@ -80,7 +80,8 @@ class SessionStealer:
             logger.error(f"Chrome cookie database not found at {cookies_db}")
             return {}
 
-        temp_db = Path("G:/DeadManUltimateScraper/data/temp_cookies.db")
+        import tempfile
+        temp_db = Path(tempfile.gettempdir()) / "deadman_temp_cookies.db"
         shutil.copy2(str(cookies_db), str(temp_db))
 
         cookies = {}

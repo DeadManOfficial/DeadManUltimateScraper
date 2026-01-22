@@ -18,18 +18,19 @@ import sys
 from pathlib import Path
 from urllib.parse import urlparse
 
-# Add token-optimization to path (check multiple locations)
+# Add token-optimization to path (env var or relative paths only)
 import os
-_token_opt_paths = [
-    os.environ.get("TOKEN_OPTIMIZER_PATH", ""),
-    str(Path("G:/token-optimization/src")),
-    str(Path(__file__).parent / "token-optimization" / "src"),
-    str(Path.home() / "token-optimization" / "src"),
-]
-for _path in _token_opt_paths:
-    if _path and Path(_path).exists():
-        sys.path.insert(0, _path)
-        break
+_token_opt_path = os.environ.get("TOKEN_OPTIMIZER_PATH") or os.environ.get("PYTHONPATH", "")
+if not _token_opt_path:
+    # Try relative locations
+    for _rel_path in [
+        Path(__file__).parent / "token-optimization" / "src",
+        Path(__file__).parent.parent / "token-optimization" / "src",
+        Path.home() / "token-optimization" / "src",
+    ]:
+        if _rel_path.exists():
+            sys.path.insert(0, str(_rel_path))
+            break
 
 from collections.abc import AsyncIterator
 

@@ -343,9 +343,9 @@ class TORManager:
         import os
         from pathlib import Path
 
-        # Find TOR executable
-        tor_dir = Path("G:/DeadManUltimateScraper/tor")
-        tor_exe = tor_dir / "tor" / "tor.exe"
+        # Find TOR executable (relative to package root)
+        tor_dir = Path(__file__).parent.parent.parent / "tor"
+        tor_exe = tor_dir / "tor" / ("tor.exe" if os.name == "nt" else "tor")
         torrc = tor_dir / "torrc"
 
         if not tor_exe.exists():

@@ -213,7 +213,7 @@ class OutputConfig(BaseModel):
     postgres_uri: str = "postgresql://localhost/deadman_research"
 
     # Obsidian
-    obsidian_vault: str = "G:/DeadManAI_Vault"
+    obsidian_vault: str = os.getenv("OBSIDIAN_VAULT", "./vault")
     obsidian_folder: str = "Scraped"
 
 
@@ -308,10 +308,10 @@ class Config(BaseModel):
         """
         Load API keys from secrets file or environment.
 
-        Default secrets file: G:/.secrets/DEADMAN_API_MASTER.md
+        Default secrets file: ~/.secrets/DEADMAN_API_MASTER.md or env SECRETS_FILE
         """
         if secrets_file is None:
-            secrets_file = Path("G:/.secrets/DEADMAN_API_MASTER.md")
+            secrets_file = Path(os.getenv("SECRETS_FILE", Path.home() / ".secrets" / "DEADMAN_API_MASTER.md"))
 
         # Try loading from environment first
         env_keys = {

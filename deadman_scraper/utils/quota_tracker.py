@@ -1,18 +1,19 @@
 """
 NASA-Standard API Quota Tracker
 ===============================
-Parses and updates G:/.secrets/DEADMAN_API_MASTER.md to track "Free Forever" usage.
+Parses and updates secrets file to track "Free Forever" usage.
 Ensures total accountability and quota compliance.
 """
 
 import logging
+import os
 import re
 from datetime import datetime
 from pathlib import Path
 
 logger = logging.getLogger("QuotaTracker")
 
-MASTER_FILE = Path("G:/.secrets/DEADMAN_API_MASTER.md")
+MASTER_FILE = Path(os.getenv("SECRETS_FILE", Path.home() / ".secrets" / "DEADMAN_API_MASTER.md"))
 
 class QuotaTracker:
     """

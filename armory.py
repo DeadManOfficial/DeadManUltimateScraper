@@ -38,7 +38,7 @@ class ArmoryControl:
 
         # 1. The Purge (Organization)
         print("[*] 1. Executing Project Purge...")
-        purge = ProjectPurge(Path("G:/DeadManUltimateScraper"))
+        purge = ProjectPurge(Path(__file__).parent)
         purge.execute()
         print("    [OK] Root directory sanitized.\n")
 
@@ -53,7 +53,7 @@ class ArmoryControl:
 
             # 3. Quality Gate
             print("[*] 3. Running Static Analysis & Security Scan...")
-            QualityChecker.run_all(Path("G:/DeadManUltimateScraper/scraper"))
+            QualityChecker.run_all(Path(__file__).parent / "scraper")
             print()
 
         print("█" * 60)
