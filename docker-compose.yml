@@ -1,0 +1,240 @@
+version: '3.8'
+
+# DEADMAN ULTIMATE SCRAPER - Docker Compose
+# ==========================================
+# Multi-service orchestration for full deployment.
+#
+# Services:
+# - elasticsearch: Full-text search and analytics
+# - mongodb: User configuration and preferences
+# - tor: SOCKS5 proxy for darknet access
+# - api-server: Express.js REST API
+# - dashboard: React frontend (production build served by nginx)
+# - scraper: Python scraper worker
+#
+# Based on zilbers/dark-web-scraper patterns, enhanced for DeadMan.
+
+services:
+  # ============================================
+  # ELASTICSEARCH - Full-text search engine
+  # ============================================
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: deadman-elasticsearch
+    hostname: elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+      - network.host=0.0.0.0
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      deadman-network:
+        ipv4_address: 172.28.0.10
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -q 'status'"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+
+  # ============================================
+  # MONGODB - User configuration storage
+  # ============================================
+  mongodb:
+    image: mongo:7.0
+    container_name: deadman-mongodb
+    hostname: mongodb
+    environment:
+      - MONGO_INITDB_DATABASE=deadman_scraper
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      deadman-network:
+        ipv4_address: 172.28.0.11
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+
+  # ============================================
+  # TOR PROXY - Darknet access
+  # ============================================
+  tor:
+    image: dperson/torproxy
+    container_name: deadman-tor
+    hostname: tor
+    ports:
+      - "9050:9050"   # SOCKS5 proxy
+      - "8118:8118"   # HTTP proxy (Privoxy)
+    environment:
+      - TOR_NewCircuitPeriod=300
+      - TOR_MaxCircuitDirtiness=300
+    networks:
+      deadman-network:
+        ipv4_address: 172.28.0.12
+    healthcheck:
+      test: ["CMD", "curl", "--socks5", "localhost:9050", "-s", "https://check.torproject.org/api/ip"]
+      interval: 60s
+      timeout: 30s
+      retries: 3
+    restart: unless-stopped
+
+  # ============================================
+  # REDIS - Caching and pub/sub (optional)
+  # ============================================
+  redis:
+    image: redis:7-alpine
+    container_name: deadman-redis
+    hostname: redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      deadman-network:
+        ipv4_address: 172.28.0.13
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ============================================
+  # API SERVER - Express.js backend
+  # ============================================
+  api-server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: deadman-api
+    hostname: api-server
+    ports:
+      - "8080:8080"
+    environment:
+      - NODE_ENV=production
+      - PORT=8080
+      - ELASTICSEARCH_HOST=http://elasticsearch:9200
+      - MONGODB_URI=mongodb://mongodb:27017/deadman_scraper
+      - REDIS_URL=redis://redis:6379
+      - TOR_PROXY=socks5h://tor:9050
+    volumes:
+      - ./server:/app
+      - /app/node_modules
+    networks:
+      deadman-network:
+        ipv4_address: 172.28.0.20
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # ============================================
+  # DASHBOARD - React frontend (nginx)
+  # ============================================
+  dashboard:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
+    container_name: deadman-dashboard
+    hostname: dashboard
+    ports:
+      - "3000:80"
+    environment:
+      - REACT_APP_API_URL=http://localhost:8080
+    networks:
+      deadman-network:
+        ipv4_address: 172.28.0.21
+    depends_on:
+      - api-server
+    restart: unless-stopped
+
+  # ============================================
+  # SCRAPER WORKER - Python scraper
+  # ============================================
+  scraper:
+    build:
+      context: .
+      dockerfile: Dockerfile.scraper
+    container_name: deadman-scraper
+    hostname: scraper
+    environment:
+      - ELASTICSEARCH_HOST=http://elasticsearch:9200
+      - MONGODB_URI=mongodb://mongodb:27017/deadman_scraper
+      - API_SERVER=http://api-server:8080
+      - TOR_PROXY=socks5h://tor:9050
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - .:/app
+      - ./output:/app/output
+      - ./logs:/app/logs
+    networks:
+      deadman-network:
+        ipv4_address: 172.28.0.30
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+      tor:
+        condition: service_healthy
+      api-server:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ============================================
+  # FLARESOLVERR - Cloudflare bypass (optional)
+  # ============================================
+  flaresolverr:
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    container_name: deadman-flaresolverr
+    hostname: flaresolverr
+    ports:
+      - "8191:8191"
+    environment:
+      - LOG_LEVEL=info
+      - TZ=UTC
+    networks:
+      deadman-network:
+        ipv4_address: 172.28.0.40
+    restart: unless-stopped
+
+# ============================================
+# NETWORKS
+# ============================================
+networks:
+  deadman-network:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.28.0.0/16
+
+# ============================================
+# VOLUMES
+# ============================================
+volumes:
+  elasticsearch_data:
+    driver: local
+  mongodb_data:
+    driver: local
+  redis_data:
+    driver: local
