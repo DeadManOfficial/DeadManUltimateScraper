@@ -44,7 +44,7 @@ class MissionStacker:
         # 3. Graphite Submission
         logger.info("Quality gate PASSED. Submitting stack to Command Center...")
         try:
-            subprocess.run(["gt", "submit", "--no-edit"], check=True, shell=sys.platform == "win32")
+            subprocess.run(["gt", "submit", "--no-edit"], check=True)
             logger.info("Stack successfully submitted.")
             return True
         except subprocess.CalledProcessError as e:

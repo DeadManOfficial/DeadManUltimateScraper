@@ -3,25 +3,9 @@
 
 import asyncio
 import json
-import os
 import sys
 from pathlib import Path
 from typing import Optional
-
-if sys.platform == "win32":
-    os.environ.setdefault("PYTHONIOENCODING", "utf-8")
-    try:
-        import ctypes
-        kernel32 = ctypes.windll.kernel32
-        kernel32.SetConsoleOutputCP(65001)
-        kernel32.SetConsoleCP(65001)
-        # Reconfigure stdout/stderr for UTF-8
-        if hasattr(sys.stdout, 'reconfigure'):
-            sys.stdout.reconfigure(encoding='utf-8', errors='replace')
-        if hasattr(sys.stderr, 'reconfigure'):
-            sys.stderr.reconfigure(encoding='utf-8', errors='replace')
-    except Exception:
-        pass
 
 import typer
 from rich import print as rprint
@@ -41,8 +25,8 @@ try:
 except ImportError:
     HAS_DARKWEB = False
 
-app = typer.Typer(name="deadman", help="DEADMAN ULTIMATE SCRAPER // DEATH INCARNATE", add_completion=False)
-console = Console(legacy_windows=(sys.platform == "win32"), theme=None)
+app = typer.Typer(name="deadman", help="DEADMAN ULTIMATE SCRAPER", add_completion=False)
+console = Console()
 
 # --- BLACK HAT THEME CONFIG ---
 HEADER_STYLE = "bold cyan"

@@ -39,4 +39,4 @@ tmpclaude-*
 
 # OS
 .DS_Store
-Thumbs.db
+Thumbs.db*.bfg-report*

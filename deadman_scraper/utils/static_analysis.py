@@ -6,7 +6,6 @@ Wraps 'ruff' for linting and 'bandit' for security scanning.
 """
 
 import subprocess
-import sys
 import logging
 from pathlib import Path
 
@@ -22,7 +21,7 @@ class QualityChecker:
         """Run ruff linter and formatter."""
         logger.info(f"Running ruff on {path}")
         try:
-            subprocess.run(["ruff", "check", str(path)], check=True, shell=sys.platform == "win32")
+            subprocess.run(["ruff", "check", str(path)], check=True)
             return True
         except subprocess.CalledProcessError:
             logger.error("Ruff linting failed.")
@@ -36,7 +35,7 @@ class QualityChecker:
         """Run bandit security scanner."""
         logger.info(f"Running bandit security scan on {path}")
         try:
-            subprocess.run(["bandit", "-r", str(path)], check=True, shell=sys.platform == "win32")
+            subprocess.run(["bandit", "-r", str(path)], check=True)
             return True
         except subprocess.CalledProcessError:
             logger.error("Bandit security scan found issues.")
