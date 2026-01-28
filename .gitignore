@@ -1,18 +1,42 @@
+# Python
 venv/
 __pycache__/
 *.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.ruff_cache/
+
+# Data & Logs
 data/
 logs/
 tmp/
 *.log
-dist/
 *.db
 nasa_audit_trail.jsonl
+
+# Secrets
 .env
 .secrets/
-.pytest_cache/
-.ruff_cache/
-tmpclaude-*
-test_*.py
+
+# TOR binaries (install via system/docker, not repo)
+tor/
+*.exe
+*.zip
+
+# Runtime
+results/
+*_metrics.json
 scraper_discovery_full.json
 scraper_files_list.txt
+tmpclaude-*
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

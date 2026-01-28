@@ -207,7 +207,7 @@ def tor(action: str = typer.Argument("status", help="Action: start/stop/restart/
     """Manage TOR proxy circuit integrity."""
     async def _tor():
         from deadman_scraper.core.config import Config
-        from deadman_scraper.fetch.tor_manager import TORManager
+        from deadman_scraper.fetch.tor import TORManager
         config = Config.from_env()
         manager = TORManager(config.tor)
         if action == "start":

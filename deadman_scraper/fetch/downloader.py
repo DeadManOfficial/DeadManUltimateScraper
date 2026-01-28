@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     from deadman_scraper.core.config import Config
     from deadman_scraper.core.signals import SignalManager
     from deadman_scraper.fetch.proxy_manager import ProxyManager
-    from deadman_scraper.fetch.tor_manager import TORManager
+    from deadman_scraper.fetch.tor import TORManager
 
 logger = logging.getLogger(__name__)
 

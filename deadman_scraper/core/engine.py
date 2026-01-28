@@ -284,7 +284,7 @@ class Engine:
         # Initialize browser pool (lazy)
         # Initialize TOR if enabled
         if self.config.tor.enabled:
-            from deadman_scraper.fetch.tor_manager import TORManager
+            from deadman_scraper.fetch.tor import TORManager
 
             self._tor_manager = TORManager(self.config.tor)
             await self._tor_manager.start()
